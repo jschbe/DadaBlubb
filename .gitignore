@@ -16,6 +16,9 @@ local.properties
 
 # Build outputs (all modules)
 **/build/
+*.apk
+*.aab
+*.idsig
 
 # Kotlin
 .kotlin/
@@ -28,7 +31,14 @@ local.properties
 # Signing
 *.jks
 *.keystore
+*.p12
+*.pfx
+keystore.properties
+signing.properties
+key.properties
 
 # Environment / secrets
 .env
 .env.*
+!.env.example
+!.env.sample
