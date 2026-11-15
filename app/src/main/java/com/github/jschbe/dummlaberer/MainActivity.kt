@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -24,6 +23,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -47,7 +48,7 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DummlabererApp(model: AppViewModel, version: String) {
+internal fun DummlabererApp(model: AppViewModel, version: String) {
     val context = LocalContext.current
     var settingsVisible by rememberSaveable { mutableStateOf(false) }
     var menuVisible by remember { mutableStateOf(false) }
@@ -114,16 +115,17 @@ private fun DummlabererApp(model: AppViewModel, version: String) {
                 maxWordCount = model.maxWordCount,
                 onSettings = model::updateSettings,
                 onGenerate = model::generate,
-                onCopy = {
+                onOutputChange = model::editOutput,
+                onCopy = { text ->
                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    clipboard.setPrimaryClip(ClipData.newPlainText("Dummlaberer", model.output))
+                    clipboard.setPrimaryClip(ClipData.newPlainText("Dummlaberer", text))
                     model.notify("Copied to clipboard.")
                 },
-                onShare = {
+                onShare = { text ->
                     try {
                         context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
                             type = "text/plain"
-                            putExtra(Intent.EXTRA_TEXT, model.output)
+                            putExtra(Intent.EXTRA_TEXT, text)
                         }, "Share generated text"))
                     } catch (_: ActivityNotFoundException) {
                         model.notify("No app is available to share text.")
@@ -186,12 +188,14 @@ internal fun GeneratorScreen(
     enabled: Boolean,
     onSettings: (GeneratorSettings) -> Unit,
     onGenerate: () -> Unit,
-    onCopy: () -> Unit,
-    onShare: () -> Unit,
+    onCopy: (String) -> Unit,
+    onShare: (String) -> Unit,
+    onOutputChange: (String) -> Unit,
     maxWordCount: Int = 50
 ) {
+    val focus = LocalFocusManager.current
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+        Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text("A little rhythm. A lot of nonsense.", style = MaterialTheme.typography.bodyLarge)
@@ -240,24 +244,23 @@ internal fun GeneratorScreen(
                 }
             }
         }
-        Button(onClick = onGenerate, enabled = enabled, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
+        Button(onClick = { focus.clearFocus(); onGenerate() }, enabled = enabled, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
             Text("Generate", style = MaterialTheme.typography.titleMedium)
         }
         Text("Generated text", style = MaterialTheme.typography.titleMedium)
-        OutlinedCard(Modifier.fillMaxWidth().heightIn(min = 160.dp)) {
-            SelectionContainer {
-                Text(
-                    output.ifEmpty { "Your next nonsense word is one tap away." },
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    style = if (output.isEmpty()) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.headlineSmall,
-                    color = if (output.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
-                    softWrap = true
-                )
-            }
-        }
+        OutlinedTextField(
+            value = output,
+            onValueChange = onOutputChange,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp).testTag("output")
+                .semantics { contentDescription = "Generated text" },
+            placeholder = { Text("Your next nonsense word is one tap away.") },
+            textStyle = MaterialTheme.typography.headlineSmall,
+            minLines = 4,
+            maxLines = 8
+        )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedButton(onClick = onCopy, enabled = output.isNotEmpty(), modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("Copy") }
-            OutlinedButton(onClick = onShare, enabled = output.isNotEmpty(), modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("Share") }
+            OutlinedButton(onClick = { onCopy(output) }, enabled = output.isNotEmpty(), modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("Copy") }
+            OutlinedButton(onClick = { onShare(output) }, enabled = output.isNotEmpty(), modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("Share") }
         }
     }
 }
@@ -269,9 +272,9 @@ internal fun SettingsScreen(settings: GeneratorSettings, onChange: (GeneratorSet
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text("Saved automatically. Changes apply to the next generation.", style = MaterialTheme.typography.bodyMedium)
-        SettingGroup("Style", "Mixed balances surprises and echoes. Rhythmic favors matching sounds. Chaotic favors different starts and endings. Stems stay unique.",
+        SettingGroup("Style", "Mixed balances surprises and sound clusters. Rhythmic favors echoes and short/long pulses. Chaotic favors contrasting sounds. Stems stay unique.",
             Style.entries, settings.style, { it.label }) { onChange(settings.copy(style = it)) }
-        SettingGroup("Repetition", "High echoes earlier endings more often using different stems. Every selected stem stays unique.",
+        SettingGroup("Repetition", "High echoes sounds from earlier stems more often, including distant ones. Every selected stem stays unique.",
             Repetition.entries, settings.repetition, { it.label }) { onChange(settings.copy(repetition = it)) }
         SettingGroup("Connectors", "Frequent triples nonempty connector weights. Connectors only appear between stems.",
             Connectors.entries, settings.connectors, { it.label }) { onChange(settings.copy(connectors = it)) }

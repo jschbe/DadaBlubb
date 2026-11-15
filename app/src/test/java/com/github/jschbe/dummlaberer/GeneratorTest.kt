@@ -221,7 +221,9 @@ class GeneratorTest {
 
     private fun rhymingPairs(style: Style, repetition: Repetition): Int {
         val words = listOf("Ba", "Be", "Bo", "Bu", "Da", "De", "Do", "Du", "Fa", "Fe", "Fo", "Fu")
-            .flatMap { start -> listOf("bel", "ter", "igg", "achs", "atz", "und", "opf", "anz", "irk", "usk").map { start + it } }
+            // A consonant separates vowel groups: all stems have two syllables, isolating echo
+            // preference from the independent short/long rhythm preference.
+            .flatMap { start -> listOf("bel", "ter", "igg", "achs", "atz", "und", "opf", "anz", "irk", "usk").map { start + "m" + it } }
         val source = Dataset(words, listOf(Connector("", 1)))
         val generator = Generator(Random(927))
         var rhymes = 0

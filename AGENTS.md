@@ -6,4 +6,7 @@ Dummlaberer — Agent Guidance
 - Word Count (1–50) counts word components, not characters or connectors. Connectors occur only between components.
 - The bundled app/src/main/assets/dada.json is the Git-tracked default vocabulary and connector configuration; runtime imports must not modify the asset.
 - Use the project Gradle wrapper; run relevant tests and assembleDebug after changes where possible.
-- Do not commit or push unless explicitly requested.
+- Cover generator changes with seeded JVM tests for counts, unique stems, sound behavior, and connector boundaries/weights.
+- Default to the Medium Phone AVD, never Medium Tablet or a physical device. Inspect AVDs/ADB and resolve its serial dynamically; target Android tests explicitly at that serial.
+- Start Medium Phone if needed and wait for boot before installation/tests. Test on the emulator before a physical device; shut down only emulators started by you.
+- Do not commit, tag, or push unless explicitly requested.

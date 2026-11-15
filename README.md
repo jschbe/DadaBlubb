@@ -1,6 +1,6 @@
 # Dummlaberer
 
-Dummlaberer 1.0.0 is an offline Android playground for absurd, rhythmic,
+Dummlaberer 1.1.0 is an offline Android playground for absurd, rhythmic,
 German-sounding fantasy words, built with Kotlin and Material 3 Jetpack Compose.
 The English interface follows the system's light/dark theme and supports Android
 dynamic colors.
@@ -9,10 +9,11 @@ dynamic colors.
 
 - Exact Word Count from 1 to 50 unique stems, using synchronized buttons and a
   slider. Small imported datasets limit the maximum to their distinct stem count.
-- One continuous fantasy string with selectable, wrapping output, Copy, and the
-  Android Sharesheet. Long results scroll without truncation.
+- One continuous fantasy string in an editable, selectable, multiline text field.
+  Long results scroll inside the field; Copy and the Android Sharesheet use the
+  current edited content. Generate replaces it and clears editor focus.
 - Mixed, Rhythmic, and Chaotic styles, plus repetition and connector controls.
-- Persistent Word Count and settings; generated output survives rotation within
+- Persistent Word Count and settings; generated and edited output survives rotation within
   the current process but is not saved across process death.
 - One curated default asset containing 449 unique stems and weighted connectors.
 - Complete dataset import/export through Android's document picker and a
@@ -39,8 +40,8 @@ generated result, settings, and import confirmation, in light and dark themes.
   `com.github.jschbe.dummlaberer` are preserved.
 
 The checked-in `gradle/gradle-daemon-jvm.properties` selects JDK 25 for the Gradle
-daemon. The development machine may need network access to download that
-toolchain and build dependencies; the installed app works offline.
+daemon. The toolchain and all pinned build dependencies must already be locally
+available for offline verification; the installed app works fully offline.
 
 ## Build and run
 
@@ -50,15 +51,15 @@ configuration on an emulator or device. Alternatively, from the repository root:
 Linux:
 
 ```sh
-./gradlew assembleDebug
-./gradlew installDebug
+./gradlew --offline assembleDebug
+./gradlew --offline installDebug
 ```
 
 Windows Command Prompt:
 
 ```bat
-gradlew.bat assembleDebug
-gradlew.bat installDebug
+gradlew.bat --offline assembleDebug
+gradlew.bat --offline installDebug
 ```
 
 `installDebug` requires a connected device/emulator with debugging enabled.
@@ -68,8 +69,10 @@ The APK is `app/build/outputs/apk/debug/app-debug.apk`.
 
 1. Set **Word Count** with the slider or precise − / + controls.
 2. Tap **Generate**. First launch shows a placeholder until you generate.
-3. Long-press to select output, or use **Copy** / **Share** for the full result.
-   These actions are disabled when output is empty.
+3. Tap the output field to edit, add lines, or select text. The keyboard opens
+   when editing, without an automatic focus request on launch or generation.
+   **Copy** / **Share** use the entire current field, including edits and newlines.
+   These actions are disabled when the field is empty. **Generate** replaces edits.
 4. The three-dot menu contains **Settings**, **Import JSON**, **Export JSON**,
    **Reset to Defaults**, and **About**, in that order.
 
@@ -103,22 +106,47 @@ Display lowercases the assembled string with the German locale and titlecases
 its first Unicode code point. Umlauts, accents, and supplementary Unicode letters
 remain valid. Export retains original vocabulary spelling.
 
-Repetition refers to sounds rather than reusing stems. The algorithm uses these
-probabilities of favoring an unused stem whose last two letters match a randomly
-chosen earlier stem:
+Sound selection uses small, computed German-oriented heuristics in
+`core/SoundProfile.kt`; there are no manual rhyme lists or new JSON fields.
+The original 449 stems and their export spelling remain unchanged. A temporary
+sound key folds case, Unicode accent encoding and umlauts broadly (`ä` to `e`,
+`ö` to `o`, `ü` to `u`), common spellings (`ph/f`, `th/t`, `ck/k`, `tz/z`,
+`x/ks`, `qu/kv`, `w/v`, `sch`, `ch`, `ai/ay/ey/ei`, `ie/i`), doubled letters,
+and final `b/p`, `d/t`, `g/k`. These are deliberately approximate sound families,
+not a pronunciation dictionary; vowel length and stress are not modeled.
 
-| Style | Normal repetition | High repetition | Otherwise |
-| --- | ---: | ---: | --- |
-| Mixed | 35% | 80% | Broad selection among remaining stems |
-| Rhythmic | 75% | 95% | Favor a matching first letter for alliteration |
-| Chaotic | 5% | 65% | Favor a different first letter and different last two letters |
+Each key supplies its initial consonant group, first vowel group, final vowel
+group plus trailing consonants (the echo), and vowel-group count (approximate
+syllables). For example, `Fex` and `Pheks` can echo despite different last two
+letters; `Schnurpsel` and `Schnuff` share an onset/vowel cluster. Vowelless and
+non-German imports remain valid and fall back to broad selection.
 
-Every selection comes from the remaining unused identities. An empty preferred
-sound pool falls back to the style's alternatives, then to any remaining stem.
-High repetition increases sound echoes while preserving uniqueness and N. Sound
-patterns depend on what the active vocabulary contains; matching sounds cannot
-be preferred once their unused stems run out. Selection uses the existing
-injectable/seedable RNG and never retries used stems in a rejection loop.
+| Style | Echo attempt: Normal / High | Cluster preference | Short/long pulse preference |
+| --- | ---: | ---: | ---: |
+| Mixed | 35% / 80% | 45% | 45% |
+| Rhythmic | 75% / 92% | 85% | 85% |
+| Chaotic | 5% / 65% | Contrasting onset and sound family | None |
+
+These are conditional selection probabilities, not promised output frequencies.
+First, a soft rhythm preference narrows the unused pool to two vowel groups after
+a one-group stem, or one group after a longer stem. If unavailable, it prefers
+one/two-group stems, then falls back to all unused stems. Broad draws keep longer
+stems eligible. Echo selection then chooses an earlier sound that still has an
+unused match in that pool. When older matches exist, Normal chooses a dedicated
+distant-target pool on 60% of attempts and High on 85%; other target draws use
+all eligible earlier sounds. The distant pool prefers an ending contrasting with
+the neighbor. After two neighboring stems with the same echo, the next echo-attempt probability is multiplied by 0.45 to
+encourage a change. There is no fixed rhyme sequence.
+
+When an echo is not chosen or unavailable, Mixed and Rhythmic can favor the
+previous onset plus first vowel with a different ending; Chaotic favors a
+different onset and sound family. Empty preferred pools fall back to the available
+unused stems. High repetition increases sound echoes without repeating identities.
+The rhythm bias is useful especially for counts 5–10, while all counts 1–50
+retain exact size and uniqueness. Results depend on the imported vocabulary;
+small or uniform vocabularies naturally offer fewer sound contrasts. Selection
+uses the existing injectable/seedable RNG without retry loops over used stems.
+There is no separate Poetry Mode.
 
 Connector **Normal** uses JSON weights directly. **Frequent** triples nonempty
 weights while preserving their relative proportions. With the default weights,
@@ -214,43 +242,92 @@ for four small preferences. Existing SDK and build tool versions are unchanged.
 Linux:
 
 ```sh
-./gradlew testDebugUnitTest assembleDebug :app:compileDebugAndroidTestKotlin
+./gradlew --offline testDebugUnitTest assembleDebug :app:compileDebugAndroidTestKotlin
 ```
 
 Windows:
 
 ```bat
-gradlew.bat testDebugUnitTest assembleDebug :app:compileDebugAndroidTestKotlin
+gradlew.bat --offline testDebugUnitTest assembleDebug :app:compileDebugAndroidTestKotlin
 ```
 
-JVM tests cover counts 1/2/8/50 and normalized uniqueness in all settings
+JVM tests cover counts 1–50 and normalized uniqueness in all settings
 combinations, small imports and adaptive count limits, repeated connectors and boundaries,
 empty connectors, deterministic weight tickets and distributions, different mode
-and repetition behavior, long output, Unicode, settings restoration, the bundled
-asset, malformed/schema/size/encoding/overflow validation, atomic write failures,
+and repetition behavior, phonetic spelling variants, onset/vowel clusters, distant
+echoes, flexible short/long pulses for counts 5–10, exhausted/vowelless sound
+pools, long output, Unicode, settings restoration, the bundled asset, malformed/schema/size/encoding/overflow validation, atomic write failures,
 corrupt override recovery, and reset.
 Bundled-data regression tests expect 449 normalized unique stems and connector
 weights `di:60`, `de:5`, `da:5`, `didel:5`, `eldi:5`, and empty text `:20`. They
 exercise every allowed count (1–50) with all settings combinations and verify
 fresh default loading, preserved imports, and explicit reset using the real asset.
 
-Android test sources cover Compose count controls, empty/nonempty actions,
-complete 50-stem output passed to callbacks, radio selection, real preference
-persistence, and reset retaining settings. They use isolated test state and
-preferences/files. The Android suite also covers a one-stem vocabulary with
-disabled count controls and an explanatory limit. Its sources are compiled as
-part of verification; device/UI tests were not rerun for the uniqueness and
-layout refinement. The earlier four-test Android suite passed on a Pixel 7 Pro
-running Android 17 before this refinement.
-To run device tests, use `./gradlew connectedDebugAndroidTest`
-on Linux or `gradlew.bat connectedDebugAndroidTest` on Windows with a connected
-device/emulator. This installs the app and test APK.
+Android tests cover Compose count controls, empty/nonempty actions, complete
+50-stem output, multiline editing and clearing, Copy/Share receiving edits,
+Generate replacing edits without focusing the editor, activity recreation,
+radio selection, preference persistence, and reset retaining settings. Clipboard
+content and the actual chooser/send intent payload are checked at the app boundary;
+no external receiving app is needed. Tests use isolated preferences/files where
+persistence is modified. A one-stem vocabulary has disabled count controls and
+an explanatory limit.
+
+Use **Medium Phone** (internal AVD name `medium_phone`) for Android verification;
+never default to Medium Tablet or a physical device. Inspect before starting:
+
+```sh
+"$ANDROID_HOME/emulator/emulator" -list-avds
+"$ANDROID_HOME/platform-tools/adb" devices -l
+# Start medium_phone only if it is not already running, and wait for boot.
+# Resolve each emulator's identity with: adb -s <serial> emu avd name
+# Check: adb -s <phone-serial> shell getprop sys.boot_completed  # must be 1
+ANDROID_SERIAL=<phone-serial> ./gradlew --offline connectedDebugAndroidTest
+```
+
+`ANDROID_SERIAL` must contain the dynamically discovered Medium Phone serial.
+The connected task installs the app and test APK only on the selected emulator.
+Shut down with `adb -s <phone-serial> emu kill` only if you started that emulator.
+The same wrapper tasks work from Windows with `gradlew.bat` and the appropriate
+shell environment syntax. Offline builds require all pinned artifacts already
+cached; do not change dependency versions to make a release build pass.
 
 Reports: `app/build/reports/tests/testDebugUnitTest/`,
 `app/build/reports/androidTests/connected/debug/`, and
 `app/build/reports/lint-results-debug.html`.
 
-Manual acceptance for v1.0.0 (not yet completed for this build):
+Verification on the Debian NUC, 2026-11-15:
+
+The pinned offline command
+`./gradlew --offline --no-configuration-cache testDebugUnitTest assembleDebug :app:compileDebugAndroidTestKotlin`
+failed during dependency resolution: Serialization JSON 1.9.0 is absent from the
+local cache. The explicitly targeted `:app:connectedDebugAndroidTest` command
+failed at the same prerequisite before installation. A subsequent cache-only
+attempt also identified a missing Coroutines Test JVM 1.9.0 JAR.
+
+For supplemental source verification, a temporary local init script at
+`/tmp/dummlaberer-offline-compat.init.gradle` selected cached Serialization 1.8.1
+and Coroutines 1.10.2. No project dependency declarations were changed and no
+artifacts were downloaded. With
+`./gradlew --offline --no-configuration-cache -I /tmp/dummlaberer-offline-compat.init.gradle`:
+
+| Tasks | Result with local compatibility artifacts |
+| --- | --- |
+| `testDebugUnitTest` | 46 passed; no failures or skips |
+| `assembleDebug` | Successful |
+| `:app:compileDebugAndroidTestKotlin` | Successful |
+| `:app:connectedDebugAndroidTest` | 8 passed; no failures or skips |
+
+The Android task additionally used `ANDROID_SERIAL` and
+`-Pandroid.injected.device.serial` with the serial discovered from the running
+Medium Phone AVD. The app and test APK were installed on that booted Android 16
+(API 36) phone emulator. The agent started and shut down this emulator; no tablet
+or physical device was used. The final emulator process exited successfully and
+ADB reported no remaining devices. These results cover compatibility artifacts;
+the current debug APK uses those artifacts and a build with pinned dependencies
+remains unverified. Human listening and external document/share providers remain
+manual acceptance items below.
+
+Manual acceptance for v1.1.0 (human listening and external provider checks remain):
 
 1. Generate with counts 5–10 and 50; verify there are no repeated stems. Check
    the centered controls, slider spacing, selection, complete wrapping, large
@@ -258,17 +335,18 @@ Manual acceptance for v1.0.0 (not yet completed for this build):
    one or two distinct stems and check its count limit cannot be exceeded.
 2. Try Rhythmic style with High repetition: sounds may echo while stems stay
    unique. Rotate, switch light/dark theme, and relaunch; check saved settings.
-3. Copy and paste into another app; share through the actual system Sharesheet.
+3. Edit multiple lines and a long result, then copy and paste into another app;
+   share the edits through the actual system Sharesheet. Generate again to replace
+   edits, and rotate to check text retention.
 4. Export, edit, import, cancel once, then confirm. Generate from the import and
    export again. Reject malformed JSON without replacing the previous dataset.
 5. Reset and check defaults return while settings remain. Check document picker
    cancellation and destination replacement on the device's provider.
-6. Verify the three-dot menu order and About, including visible version `1.0.0`.
+6. Verify the three-dot menu order and About, including visible version
+   `1.1.0` (versionCode 2).
 
 The debug APK is for manual acceptance and is not a published release artifact.
-Only after the user explicitly approves manual results should a separate release
-step create the v1.0.0 commit and annotated tag. Pushing remains the user's
-responsibility.
+Commits, tags, pushes, and release publication require an explicit user request.
 
 ## Privacy and offline behavior
 

@@ -62,6 +62,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         if (ready) output = generator.generate(checkNotNull(dataset), settings).text
     }
 
+    fun editOutput(value: String) { output = value }
+
     fun importFrom(uri: Uri) = perform("import JSON") {
         pendingImport = withContext(Dispatchers.IO) {
             (resolver.openInputStream(uri) ?: throw IOException("The document could not be opened."))

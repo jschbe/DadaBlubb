@@ -51,51 +51,77 @@ data class Generation(val components: List<String>, val connectors: List<String>
 class Generator(private val random: Random = Random.Default) {
     fun generate(dataset: Dataset, settings: GeneratorSettings): Generation {
         DatasetCodec.validate(dataset)
-        val remaining = dataset.uniqueWords.toMutableList()
+        val remaining = dataset.uniqueWords.map { Stem(it, SoundProfile.of(it)) }.toMutableList()
         require(settings.wordCount <= remaining.size) {
             "Word Count must not exceed ${remaining.size} unique stems in the active vocabulary."
         }
-        val components = mutableListOf<String>()
+        val selected = mutableListOf<Stem>()
         val connectors = mutableListOf<String>()
         repeat(settings.wordCount) {
-            val word = nextWord(remaining, components, settings)
-            components += word
+            val word = nextWord(remaining, selected, settings)
+            selected += word
             remaining.remove(word)
             if (it > 0) connectors += chooseConnector(dataset.connectors, settings.connectors)
         }
-        return Generation(components, connectors)
+        return Generation(selected.map { it.text }, connectors)
     }
 
-    private fun nextWord(words: List<String>, history: List<String>, settings: GeneratorSettings): String {
+    private data class Stem(val text: String, val sound: SoundProfile)
+
+    private fun nextWord(words: List<Stem>, history: List<Stem>, settings: GeneratorSettings): Stem {
         if (history.isEmpty()) return words.random(random)
-        // Repetition now echoes endings rather than selecting an already-used stem.
         val echoChance = when (settings.style) {
             Style.MIXED -> if (settings.repetition == Repetition.HIGH) 0.80 else 0.35
-            Style.RHYTHMIC -> if (settings.repetition == Repetition.HIGH) 0.95 else 0.75
+            Style.RHYTHMIC -> if (settings.repetition == Repetition.HIGH) 0.92 else 0.75
             Style.CHAOTIC -> if (settings.repetition == Repetition.HIGH) 0.65 else 0.05
         }
-        if (random.nextDouble() < echoChance) {
-            val target = history.random(random)
-            val echoes = words.filter { rhyme(it) == rhyme(target) }
-            if (echoes.isNotEmpty()) return echoes.random(random)
+        val previous = history.last().sound
+        val rhythmChance = when (settings.style) {
+            Style.MIXED -> 0.45
+            Style.RHYTHMIC -> 0.85
+            Style.CHAOTIC -> 0.0
         }
-        val previous = history.last()
-        val candidates = when (settings.style) {
-            Style.RHYTHMIC -> words.filter { firstLetter(it) == firstLetter(previous) }
-            Style.CHAOTIC -> words.filter {
-                rhyme(it) != rhyme(previous) && firstLetter(it) != firstLetter(previous)
+        var available = words
+        if (random.nextDouble() < rhythmChance) {
+            // Choose a loose pulse before sound matching, so an echo cannot lock the cadence.
+            val preferredLength = if (previous.syllables == 1) 2 else 1
+            available = words.filter { it.sound.syllables == preferredLength }.ifEmpty {
+                words.filter { it.sound.syllables <= 2 }.ifEmpty { words }
             }
-            Style.MIXED -> emptyList()
         }
-        return candidates.ifEmpty { words }.random(random)
-    }
-
-    private fun firstLetter(word: String): Int = Character.toLowerCase(word.codePointAt(0))
-
-    private fun rhyme(word: String): String {
-        val lower = word.lowercase(Locale.GERMAN)
-        val count = lower.codePointCount(0, lower.length)
-        return lower.substring(lower.offsetByCodePoints(0, (count - 2).coerceAtLeast(0)))
+        var candidates = emptyList<Stem>()
+        val echoRun = history.size > 1 && previous.echoes(history[history.lastIndex - 1].sound)
+        if (random.nextDouble() < echoChance * if (echoRun) 0.45 else 1.0) {
+            // Often reach past the neighbor, but never impose an ABAB or other fixed rhyme scheme.
+            val availableRhymes = available.map { it.sound.rhyme }.filter { it.isNotEmpty() }.toSet()
+            val eligible = history.filter { it.sound.rhyme in availableRhymes }
+            val earlier = eligible.filter { it != history.last() }
+            val distantChance = if (settings.repetition == Repetition.HIGH) 0.85 else 0.60
+            val targets = if (earlier.isNotEmpty() && random.nextDouble() < distantChance) {
+                earlier.filter { !it.sound.echoes(previous) }.ifEmpty { earlier }
+            } else eligible
+            if (targets.isNotEmpty()) {
+                val target = targets.random(random).sound
+                candidates = available.filter { it.sound.echoes(target) }
+            }
+        }
+        if (candidates.isEmpty()) {
+            val clusterChance = when (settings.style) {
+                Style.MIXED -> 0.45
+                Style.RHYTHMIC -> 0.85
+                Style.CHAOTIC -> 0.0
+            }
+            candidates = when {
+                settings.style == Style.CHAOTIC -> available.filter {
+                    !it.sound.clustersWith(previous) && it.sound.onset != previous.onset
+                }
+                random.nextDouble() < clusterChance -> available.filter {
+                    it.sound.clustersWith(previous) && !it.sound.echoes(previous)
+                }
+                else -> emptyList()
+            }
+        }
+        return candidates.ifEmpty { available }.random(random)
     }
 
     /** Frequent triples nonempty weights, retaining their relative distribution. Long avoids overflow. */

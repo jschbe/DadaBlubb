@@ -1,10 +1,19 @@
 package com.github.jschbe.dummlaberer
 
+import android.app.Application
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.ContextWrapper
+import android.content.Intent
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.test.espresso.Espresso.closeSoftKeyboard
 import androidx.test.platform.app.InstrumentationRegistry
 import com.github.jschbe.dummlaberer.core.*
 import com.github.jschbe.dummlaberer.ui.theme.DummlabererTheme
@@ -20,7 +29,7 @@ class AppUiTest {
         var settings by mutableStateOf(GeneratorSettings())
         compose.setContent {
             DummlabererTheme {
-                GeneratorScreen(settings, "", true, { settings = it }, {}, {}, {})
+                GeneratorScreen(settings, "", true, { settings = it }, {}, {}, {}, {})
             }
         }
         compose.onNodeWithText("Copy").assertIsNotEnabled()
@@ -48,7 +57,7 @@ class AppUiTest {
             DummlabererTheme {
                 GeneratorScreen(settings, output, true, {},
                     { output = Generator(Random(1)).generate(dataset, settings).text },
-                    { copied = output }, { shared = output })
+                    { copied = it }, { shared = it }, { output = it })
             }
         }
         compose.onNodeWithText("Generate").performScrollTo().performClick()
@@ -56,6 +65,73 @@ class AppUiTest {
         compose.onNodeWithText("Copy").performScrollTo().assertIsEnabled().performClick()
         compose.onNodeWithText("Share").performScrollTo().assertIsEnabled().performClick()
         compose.runOnIdle { assertEquals(expected, copied); assertEquals(expected, shared) }
+    }
+
+    @Test fun editedMultilineOutputFeedsActionsAndGenerateReplacesItWithoutFocusing() {
+        var output by mutableStateOf("")
+        var copied = ""
+        var shared = ""
+        val generated = "Möterdiröngel"
+        val edited = "First edited line\n" + "Schnurpsel ".repeat(180) + "\nLast line"
+        compose.setContent {
+            DummlabererTheme {
+                GeneratorScreen(GeneratorSettings(), output, true, {}, { output = generated },
+                    { copied = it }, { shared = it }, { output = it })
+            }
+        }
+        compose.onNodeWithTag("output").assertIsNotFocused()
+        compose.onNodeWithText("Generate").performClick()
+        compose.onNodeWithTag("output").assertTextEquals(generated).assertIsNotFocused()
+        compose.onNodeWithTag("output").performScrollTo().performTextReplacement(edited)
+        compose.onNodeWithTag("output").assertTextEquals(edited)
+        // Finish the system IME transition before scrolling to action hit targets.
+        closeSoftKeyboard()
+        compose.waitForIdle()
+        compose.onNodeWithText("Copy").performScrollTo().performClick()
+        compose.runOnIdle { assertEquals("Copy must use the complete edited field", edited, copied) }
+        compose.onNodeWithText("Share").performScrollTo().performClick()
+        compose.runOnIdle { assertEquals("Share must use the complete edited field", edited, shared) }
+        compose.onNodeWithText("Generate").performScrollTo().performClick()
+        compose.onNodeWithTag("output").assertTextEquals(generated).assertIsNotFocused()
+        compose.onNodeWithTag("output").performScrollTo().performTextClearance()
+        compose.onNodeWithText("Copy").assertIsNotEnabled()
+        compose.onNodeWithText("Share").assertIsNotEnabled()
+    }
+
+    @Test fun appCopiesEditedTextAndBuildsSharesheetIntentWithoutLaunchingAnotherApp() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        lateinit var model: AppViewModel
+        var launched: Intent? = null
+        compose.runOnIdle { model = AppViewModel(context.applicationContext as Application) }
+        compose.setContent {
+            val activityContext = LocalContext.current
+            val capturingContext = remember(activityContext) {
+                object : ContextWrapper(activityContext) {
+                    override fun startActivity(intent: Intent) { launched = intent }
+                }
+            }
+            CompositionLocalProvider(LocalContext provides capturingContext) {
+                DummlabererTheme { DummlabererApp(model, "test") }
+            }
+        }
+        compose.waitUntil(10_000) { model.ready }
+        val edited = "Edited Möter\nSecond line"
+        compose.onNodeWithTag("output").performScrollTo().performTextReplacement(edited)
+        compose.onNodeWithText("Copy").performScrollTo().performClick()
+        compose.runOnIdle {
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            assertEquals(edited, clipboard.primaryClip!!.getItemAt(0).text.toString())
+        }
+        compose.onNodeWithText("OK").performClick()
+        compose.onNodeWithText("Share").performScrollTo().performClick()
+        compose.runOnIdle {
+            assertEquals(Intent.ACTION_CHOOSER, launched!!.action)
+            @Suppress("DEPRECATION")
+            val send = launched!!.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)!!
+            assertEquals(Intent.ACTION_SEND, send.action)
+            assertEquals("text/plain", send.type)
+            assertEquals(edited, send.getStringExtra(Intent.EXTRA_TEXT))
+        }
     }
 
     @Test fun settingsRadioControlsUpdateOneSettingsValue() {
@@ -75,7 +151,7 @@ class AppUiTest {
         val settings = GeneratorSettings(8).cappedTo(source)
         compose.setContent {
             DummlabererTheme {
-                GeneratorScreen(settings, "", true, {}, {}, {}, {}, maxWordCount = source.maxWordCount)
+                GeneratorScreen(settings, "", true, {}, {}, {}, {}, {}, maxWordCount = source.maxWordCount)
             }
         }
         compose.onNodeWithContentDescription("Word count: 1").assertExists()
