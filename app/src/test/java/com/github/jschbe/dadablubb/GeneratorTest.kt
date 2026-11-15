@@ -84,15 +84,15 @@ class GeneratorTest {
 
     @Test fun revisedBundleWeightsDriveNormalAndFrequentConnectorSelection() {
         val connectors = bundledDataset().connectors
-        val normal = listOf(0L to "di", 59L to "di", 60L to "de", 64L to "de",
-            65L to "da", 69L to "da", 70L to "didel", 74L to "didel",
-            75L to "eldi", 79L to "eldi", 80L to "", 99L to "")
+        val normal = listOf(0L to "di", 59L to "di", 60L to "de", 61L to "de",
+            62L to "da", 67L to "da", 68L to "didel", 73L to "didel",
+            74L to "eldi", 79L to "eldi", 80L to "", 99L to "")
         for ((ticket, text) in normal) {
             assertEquals(text, Generator(TicketRandom(ticket, 100)).chooseConnector(connectors, Connectors.NORMAL))
         }
-        val frequent = listOf(0L to "di", 179L to "di", 180L to "de", 194L to "de",
-            195L to "da", 209L to "da", 210L to "didel", 224L to "didel",
-            225L to "eldi", 239L to "eldi", 240L to "", 259L to "")
+        val frequent = listOf(0L to "di", 179L to "di", 180L to "de", 185L to "de",
+            186L to "da", 203L to "da", 204L to "didel", 221L to "didel",
+            222L to "eldi", 239L to "eldi", 240L to "", 259L to "")
         for ((ticket, text) in frequent) {
             assertEquals(text, Generator(TicketRandom(ticket, 260)).chooseConnector(connectors, Connectors.FREQUENT))
         }

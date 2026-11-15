@@ -9,6 +9,11 @@ class OutputStateTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
 
     @Test fun editedOutputSurvivesActivityRecreationAndGenerateReplacesIt() {
+        compose.waitUntil(10_000) {
+            compose.onAllNodesWithTag("output").fetchSemanticsNodes().any {
+                !it.config.contains(androidx.compose.ui.semantics.SemanticsProperties.Disabled)
+            }
+        }
         val edited = "My edited output\nWith a second line"
         compose.onNodeWithTag("output").performScrollTo().performTextReplacement(edited)
         compose.activityRule.scenario.recreate()

@@ -5,10 +5,9 @@ German-sounding fantasy words, built with Kotlin and Material 3 Jetpack Compose.
 The interface supports German and English, persistent System default / Light /
 Dark themes, and Android dynamic colors. Gradle's root project is **DadaBlubb**;
 the Kotlin package, namespace and applicationId are **`com.github.jschbe.dadablubb`**.
-The planned repository URL is
-[github.com/jschbe/DadaBlubb](https://github.com/jschbe/DadaBlubb). The owner must
-still rename the GitHub repository; no remote or GitHub setting is changed by
-the naming cleanup. The local checkout directory can retain its existing name.
+The public repository is
+[github.com/jschbe/DadaBlubb](https://github.com/jschbe/DadaBlubb).
+The local checkout directory can retain its existing name.
 
 ## Installation identity and existing data
 
@@ -31,8 +30,8 @@ the new app's data in the usual way.
   Long results scroll inside the field; Copy and the Android Sharesheet use the
   current edited content. Generate replaces it and clears editor focus.
 - Mixed, Rhythmic, and Chaotic styles, plus repetition and connector controls.
-- Persistent Word Count and settings; generated and edited output survives rotation within
-  the current process but is not saved across process death.
+- Persistent Word Count, settings and generated/edited output, including intentionally
+  empty output, across activity recreation and complete app restarts.
 - One curated default asset containing 449 unique stems and weighted connectors.
 - Complete dataset import/export through Android's document picker and a
   confirmed reset that keeps settings.
@@ -90,7 +89,8 @@ The APK is `app/build/outputs/apk/debug/app-debug.apk`.
 ## Usage
 
 1. Set **Word Count** with the slider or precise − / + controls.
-2. Tap **Generate**. First launch shows a placeholder until you generate.
+2. Tap **Generate**. The placeholder appears only until output has first been saved.
+   Later launches restore the saved text, including an intentionally empty field.
 3. Tap the output field to edit, add lines, or select text. The keyboard opens
    when editing, without an automatic focus request on launch or generation.
    **Copy** / **Share** use the entire current field, including edits and newlines.
@@ -130,10 +130,11 @@ configuration context resolves exactly `de` or `en` on every creation on both
 paths, enforcing the first-system-language / English-fallback rule. No AppCompat
 or other new runtime dependency is needed, and no global system setting changes.
 
-The ViewModel retains generated/edited text, pending imports, generator settings
-and structured feedback through locale/configuration recreation. Navigation is
+The process-owned output repository retains generated/edited text; the ViewModel
+retains pending imports, generator settings and structured feedback through
+locale/configuration recreation. Navigation is
 saved with Compose `rememberSaveable`. Theme changes need no activity recreation.
-As before, the output is not persisted after process death. Core validation
+Output is now saved independently of the ViewModel as described below. Core validation
 exposes typed diagnostic keys and arguments; the Android layer resolves them in
 the current UI locale when shown, including errors that finish after a switch.
 English diagnostic text remains available to standalone JVM callers and tests. Compose reads labels, semantics and callback text with
@@ -142,6 +143,30 @@ uses `LocalResources.current`. These reads observe configuration changes instead
 of relying on a stable `LocalContext` identity. Android App Bundles disable
 language splitting (`bundle.language.enableSplit = false`) so both UI languages
 remain available offline after a Play installation.
+
+## Saved output
+
+The current generated or edited text is stored locally in `files/output.txt` as
+UTF-8, capped at **64 KiB of encoded text**. New edits update the UI immediately.
+Oversized changes and malformed Unicode are rejected with localized feedback;
+accepted text is never silently truncated. Generate replaces and saves the output.
+Copy and Share use the current editor text, including unsaved text after a write
+failure. Vocabulary import/reset and generation-setting changes do not clear it.
+
+A missing file is the first-start state. A zero-byte file is an intentionally
+empty result: it remains blank after restart without showing the first-start
+placeholder. Loading/error states are separate; a read failure shows an error
+and leaves the saved file untouched until an explicit edit or Generate.
+
+One process-owned repository serializes writes on an IO dispatcher independently
+of activity/ViewModel cancellation. Pending changes are conflated to the latest
+revision; older writes cannot finish after a newer write. Initial loading cannot
+overwrite a later edit. Each completed write syncs a temporary file and atomically
+replaces the previous file. Failure retains the prior saved file, keeps current
+text editable, and shows localized feedback; edit or Generate retries. A process
+kill or power loss before the latest write completes can still lose that pending
+change. There is no promise of synchronous per-keystroke durability or recovery
+of output lost before this feature was installed.
 
 ## Generator rules
 
@@ -232,14 +257,17 @@ and Pömpel. Example schema v1:
   "words": ["Möter", "Röngel", "Döngel", "Rubbel", "Nuddel", "Wachs", "Blogg"],
   "connectors": [
     {"text": "di", "weight": 60},
-    {"text": "de", "weight": 5},
-    {"text": "da", "weight": 5},
-    {"text": "didel", "weight": 5},
-    {"text": "eldi", "weight": 5},
+    {"text": "de", "weight": 2},
+    {"text": "da", "weight": 6},
+    {"text": "didel", "weight": 6},
+    {"text": "eldi", "weight": 6},
     {"text": "", "weight": 20}
   ]
 }
 ```
+
+The bundled connector weights sum to **100**. This weight update preserves all
+449 stems in their original order and leaves schema v1 and generator logic unchanged.
 
 Validation rejects invalid content with localized English/German errors:
 
@@ -274,8 +302,13 @@ localized warning and fallback to defaults; import again or reset to repair it.
 
 **Export JSON** suggests `dada-blubb.json` and writes the currently active
 complete dataset as human-readable UTF-8 JSON, including weights. It exports
-vocabulary, not generated output. Android's document provider handles destination
-selection and replacement of an existing document.
+vocabulary, not generated output. Complete schema validation, UTF-8 encoding and
+size checks finish before opening the destination. Write and close failures show
+an error warning that the destination may be incomplete; the active vocabulary
+is unaffected. SAF providers do not offer universal atomic replacement. The
+CreateDocument picker normally creates a new document (adding a name suffix for
+collisions); some system/provider paths permit explicitly confirmed replacement.
+Do not rely on a failed export preserving a preexisting destination.
 
 **Reset to Defaults** requires confirmation, discards the override, and reloads
 the bundled asset. Word Count, style, repetition, and connector settings remain.
@@ -291,10 +324,12 @@ to inspect the active words and weights.
 
 The app remains one Kotlin/Compose module. `core/` contains Android-independent
 generation, sound profiles, settings and JSON validation. `data/` handles dataset
-files and small SharedPreferences stores. The Android ViewModel runs file/document
-work on `Dispatchers.IO`. Namespace and applicationId are
+files, bounded output persistence and small SharedPreferences stores. Dataset and
+document IO runs through the ViewModel on `Dispatchers.IO`; output writes use a
+separate process-owned IO scope. Namespace and applicationId are
 `com.github.jschbe.dadablubb`. MinSdk 28, SDK/tool versions, generator behavior,
-all 449 stems, connector weights and original artwork are preserved. VersionName is **1.2.0**, versionCode **3**. No dependency was added or
+all 449 stems and original artwork are preserved. Default connector weights are
+documented above. VersionName is **1.2.0**, versionCode **3**. No dependency was added or
 substituted for this milestone. There is no backend, DI framework or database.
 
 ## Tests and verification
@@ -319,7 +354,7 @@ echoes, flexible short/long pulses for counts 5–10, exhausted/vowelless sound
 pools, long output, Unicode, settings restoration, the bundled asset, malformed/schema/size/encoding/overflow validation, atomic write failures,
 corrupt override recovery, and reset.
 Bundled-data regression tests expect 449 normalized unique stems and connector
-weights `di:60`, `de:5`, `da:5`, `didel:5`, `eldi:5`, and empty text `:20`. They
+weights `di:60`, `de:2`, `da:6`, `didel:6`, `eldi:6`, and empty text `:20`. They
 exercise every allowed count (1–50) with all settings combinations and verify
 fresh default loading, preserved imports, and explicit reset using the real asset.
 
@@ -357,6 +392,85 @@ cached; do not change dependency versions to make a release build pass.
 Reports: `app/build/reports/tests/testDebugUnitTest/`,
 `app/build/reports/androidTests/connected/debug/`, and
 `app/build/reports/lint-results-debug.html`.
+
+### Review fixes DB-01–DB-06 verification
+
+Version **1.2.0 / code 3**, applicationId **`com.github.jschbe.dadablubb`**, minSdk,
+dependencies, generator, bundled 449 stems/connector weights and artwork are
+unchanged. Backup rules, export error handling, durable output and documentation
+were updated. No release signing/AAB/Play installation was performed.
+
+Regular declared dependencies, Gradle Wrapper, offline:
+
+```sh
+./gradlew --offline --no-configuration-cache testDebugUnitTest \
+  :app:compileDebugAndroidTestKotlin lintDebug assembleDebug :app:assembleDebugAndroidTest
+./gradlew --offline --no-configuration-cache -q :app:dependencies \
+  --configuration releaseRuntimeClasspath
+```
+
+| Check | Result |
+| --- | --- |
+| `testDebugUnitTest` | 68 passed, 0 failures/errors/skips; 18 new tests cover backup configuration, document stream failures, bounded atomic output, cold-store restoration and concurrent updates |
+| `:app:compileDebugAndroidTestKotlin` | Successful, including the existing suite and four new isolated tests |
+| `lintDebug` | Successful: 0 errors, 11 previously reviewed warnings, 0 hints; no baseline/suppressions added |
+| `assembleDebug`, `:app:assembleDebugAndroidTest` | Successful |
+| Release runtime dependency graph | Resolved offline: 109 modules, 75 JAR/AAR artifacts; see THIRD_PARTY_NOTICES.md |
+| Isolated A51 instrumentation | 4 passed, 0 failures/skips: two provider tests and two Compose/lifecycle tests |
+
+The 11 remaining warnings are `UnusedAttribute` (1), `AndroidGradlePluginVersion`
+(2), `GradleDependency` (1), `NewerVersionAvailable` (2), `IconXmlAndPng` (2),
+`MonochromeLauncherIcon` (2), and `UseKtx` (1). Their rationale remains in the
+historical lint-cleanup table; no dependency or artwork changes were made.
+
+This pass used only the explicitly authorized **Samsung Galaxy A51 SM-A515F,
+Android 13 / API 33**, selected dynamically from `adb devices -l`. Both APKs were
+installed with explicit `adb -s <discovered-A51-serial> install -r -t <apk>`.
+Only these safe test classes were executed:
+
+```sh
+adb -s <discovered-A51-serial> shell am instrument -w -r -e class \
+  com.github.jschbe.dadablubb.ReviewDocumentsTest,com.github.jschbe.dadablubb.ReviewOutputUiTest \
+  com.github.jschbe.dadablubb.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+The provider tests use Android `DocumentsContract`, a real wrapped
+`ContentResolver`/`ParcelFileDescriptor`, and an **in-process fixture DocumentsProvider**
+on API 29+. Export/import/content comparison/reset and missing/denied/malformed
+input operate only on unique cache files. They do not exercise chooser grants,
+third-party/cloud provider behavior or reset the active user vocabulary. JVM tests
+also inject write and close failures. Compose tests use standalone UI and unique
+cache/preferences: edited action payloads, empty-output restoration, Generate,
+and a deliberately blocked write completing after `ViewModelStore.clear()`.
+
+`connectedDebugAndroidTest` and the full existing activity-based suite were not
+run on this populated phone: those tests modify app state, and Gradle-managed
+deployment/cleanup was avoided to preserve the installed app. No emulator was
+started, no app was uninstalled, and no app data was cleared.
+
+ADB-driven checks of the installed **main app** confirmed Generate/edit, exact
+saved text after Home/app switching and force-stop/cold launch, intentionally
+empty output without the first-start placeholder, and Generate after clearing.
+German/English switching, system language on the phone's English system locale,
+light/dark/system themes, About in both languages, and output retention through
+locale recreation were checked. Actual Copy was verified by Ctrl+V paste-back;
+the Sharesheet preview contained the exact edited text and was canceled without
+selecting a recipient. German app language and System default appearance were
+restored. Active vocabulary, generator/UI preferences and saved output were
+byte-for-byte identical before/after the final repeated upgrade, isolated test
+run and launch. The first pre-install capture accidentally listed filenames
+instead of hashes, so there is no byte-level before/after proof relative to the
+start of this task. No test wrote to the active user vocabulary. Final launch
+logs had no error/fatal lines for the app process and no app crash-buffer entry.
+The app was left running on the A51.
+
+Real cloud backup/D2D migration, API 28–32 locale execution, unsupported/German
+system-locale device scenarios, external document-provider roundtrips, full-device
+reboot and release/Play artifacts remain unverified. Process restart was tested
+with force-stop/relaunch, not a device reboot. JVM tests cover deterministic
+language fallback and storage reconstruction; they do not replace those device
+scenarios. The configured cloud exclusions were checked in source and compiled
+APK XML; no system backup/restore was triggered.
 
 ### Historical v1.2.0 verification (before lint and naming cleanup)
 
@@ -491,7 +605,7 @@ Reports: `app/build/reports/lint-results-debug.html` (also XML/text/SARIF),
 `app/build/reports/androidTests/connected/debug/`. The debug APK remains at
 `app/build/outputs/apk/debug/app-debug.apk`.
 
-### Naming cleanup verification (current identity)
+### Historical naming cleanup verification
 
 The pre-upload identity is now consistent: Gradle root project **DadaBlubb**,
 package/namespace/applicationId **`com.github.jschbe.dadablubb`**, Android style
@@ -499,10 +613,10 @@ package/namespace/applicationId **`com.github.jschbe.dadablubb`**, Android style
 **`DadaBlubbTheme`**. All 25 Kotlin source/test files were moved into matching
 `com/github/jschbe/dadablubb` directories. The archived artwork source is now
 `app/artwork/DadaBlubb.png`; its bytes and all launcher artwork are unchanged.
-Version **1.2.0 / code 3** is unchanged. The owner must still rename the GitHub
-repository to **jschbe/DadaBlubb**; the About link and documentation use the
-planned URL. Git remotes, commits/tags and the local checkout directory were not
-renamed or rewritten.
+Version **1.2.0 / code 3** was unchanged. At the time of the naming cleanup,
+**jschbe/DadaBlubb** was the planned URL; the repository has since been renamed
+and made public. Git remotes, commits/tags and the local checkout directory were
+not renamed or rewritten by that cleanup.
 
 Checks against the uncommitted starting tree confirmed that Kotlin content differs
 only in reviewed identity names/imports/URLs, with no generation or other functional
@@ -544,7 +658,7 @@ test deployment was cleaned up. Generate produced nonempty editable output.
 Import and Export both opened the system document picker and returned to the new
 app on cancellation; no document was overwritten and no reset was confirmed.
 The existing suite verified edited text, clipboard/Share payloads, theme/language
-selection, navigation and About including the planned source URL. The app stayed
+selection, navigation and About including the source URL. The app stayed
 alive with no fatal exception or app crash-buffer entry. Android 16 Logcat emitted
 ashmem deprecation and blocked accessibility hidden-API diagnostics during UI
 inspection; no failed UI operation was observed. Dependency upgrades are outside
@@ -587,8 +701,8 @@ project's license; third-party rights remain unaffected.
 
 Developed with the assistance of OpenAI Codex.
 
-Source (planned repository name): [github.com/jschbe/DadaBlubb](https://github.com/jschbe/DadaBlubb).
-The owner still needs to rename the repository on GitHub. The visible name is
+Public source: [github.com/jschbe/DadaBlubb](https://github.com/jschbe/DadaBlubb).
+The visible name is
 Dada Blubb; the Gradle project is DadaBlubb and the package/applicationId is
 `com.github.jschbe.dadablubb`. Git remotes and the local checkout directory are
 left unchanged. See Installation identity and existing data above for the
@@ -599,6 +713,29 @@ separate-installation consequence of this pre-upload change.
 No INTERNET or storage permission, backend, analytics, ads, or network calls.
 Generation, validation, and private persistence work offline. Clipboard, sharing,
 and document providers and the source-code link use Android system features; other
-apps/providers may
-have their own network behavior. Android system backups follow the existing
-manifest backup configuration and device settings.
+apps/providers may have their own network behavior.
+
+### Android backup policy
+
+Automatic **Android app-data cloud backup is excluded by configuration**; supported
+device-to-device transfers remain allowed (`allowBackup=true`). This covers all
+nine Android backup domains, including credential/device-protected files and
+preferences. Imported `files/active-dada.json`, `files/output.txt`, generator and
+UI SharedPreferences are excluded from cloud backup and eligible for D2D.
+
+- API 28–30 uses `fullBackupContent`: every explicit include requires the
+  `deviceToDeviceTransfer` transport flag. Cloud transports without that flag
+  cannot include those files; transfers without the flag cannot include them either.
+- API 31+ uses `dataExtractionRules`: every domain is excluded from `cloud-backup`
+  and explicitly included in `device-transfer`.
+- Android always excludes cache/no-backup directories. The bundled asset ships
+  with the APK and does not depend on restored data.
+
+These are Android framework policy rules, not a guarantee that any particular
+OS/OEM/transport will implement D2D migration or honor every rule. Existing older
+cloud snapshots are not retroactively erased. OS-owned settings and user-directed
+exports, clipboard, shares or provider storage are outside these app-private
+backup rules, so this is not a claim that text can never reach cloud storage.
+No cloud backup, restore, real device migration or global backup setting was
+triggered during these review fixes. See
+[Android Auto Backup rules](https://developer.android.com/identity/data/autobackup).

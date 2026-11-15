@@ -12,6 +12,9 @@ import com.github.jschbe.dadablubb.core.*
 import com.github.jschbe.dadablubb.data.DatasetStorage
 import com.github.jschbe.dadablubb.data.SettingsStorage
 import com.github.jschbe.dadablubb.data.UiSettingsStorage
+import com.github.jschbe.dadablubb.data.AppOutput
+import com.github.jschbe.dadablubb.data.OutputRepository
+import com.github.jschbe.dadablubb.data.DatasetDocuments
 import java.io.IOException
 import java.io.File
 import kotlinx.coroutines.CancellationException
@@ -19,7 +22,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class AppViewModel(application: Application) : AndroidViewModel(application) {
+class AppViewModel @JvmOverloads constructor(
+    application: Application,
+    private val outputStore: OutputRepository = AppOutput.get(application)
+) : AndroidViewModel(application) {
     private val storage = DatasetStorage(File(application.filesDir, "active-dada.json")) {
         application.assets.open("dada.json")
     }
@@ -34,15 +40,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         private set
     var settings by mutableStateOf(preferences.load())
         private set
-    var output by mutableStateOf("")
-        private set
+    val outputState = outputStore.state
+    val output get() = outputState.value.text
     var busy by mutableStateOf(false)
         private set
     var message by mutableStateOf<UiMessage?>(null)
         private set
     var pendingImport by mutableStateOf<Dataset?>(null)
         private set
-    val ready get() = dataset != null && !busy
+    val ready get() = dataset != null && !busy && outputState.value.loaded
 
     init {
         perform(R.string.action_load) {
@@ -64,15 +70,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun generate() {
-        if (ready) output = generator.generate(checkNotNull(dataset), settings).text
+        if (ready) outputStore.update(generator.generate(checkNotNull(dataset), settings).text)
     }
 
-    fun editOutput(value: String) { output = value }
+    fun editOutput(value: String) { outputStore.update(value) }
 
     fun importFrom(uri: Uri) = perform(R.string.action_import) {
         pendingImport = withContext(Dispatchers.IO) {
-            (resolver.openInputStream(uri) ?: throw IOException("The document could not be opened."))
-                .use(DatasetCodec::read)
+            DatasetDocuments.read { resolver.openInputStream(uri) }
         }
     }
 
@@ -94,8 +99,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val snapshot = dataset ?: return
         perform(R.string.action_export) {
             withContext(Dispatchers.IO) {
-                (resolver.openOutputStream(uri, "wt") ?: throw IOException("The document could not be opened."))
-                    .bufferedWriter(Charsets.UTF_8).use { it.write(DatasetCodec.encode(snapshot)) }
+                DatasetDocuments.write(snapshot) { resolver.openOutputStream(uri, "wt") }
             }
             notify(R.string.exported)
         }
@@ -125,11 +129,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             } catch (error: DatasetException) {
                 notify(R.string.message_detail, error.detail)
             } catch (_: SecurityException) {
-                notify(R.string.operation_denied, UiMessage(action))
+                if (action == R.string.action_export) notify(R.string.export_failed)
+                else notify(R.string.operation_denied, UiMessage(action))
             } catch (error: IOException) {
-                notify(R.string.operation_io, UiMessage(action))
+                if (action == R.string.action_export) notify(R.string.export_failed)
+                else notify(R.string.operation_io, UiMessage(action))
             } catch (_: Exception) {
-                notify(R.string.operation_failed, UiMessage(action))
+                if (action == R.string.action_export) notify(R.string.export_failed)
+                else notify(R.string.operation_failed, UiMessage(action))
             } finally {
                 busy = false
             }

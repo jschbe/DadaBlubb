@@ -47,6 +47,9 @@ android {
             it.systemProperty("app.resources", file("src/main/res").absolutePath)
             it.inputs.dir(file("src/main/res/values")).withPropertyName("englishResources")
             it.inputs.dir(file("src/main/res/values-de")).withPropertyName("germanResources")
+            it.inputs.dir(file("src/main/res/xml")).withPropertyName("xmlResources")
+            it.systemProperty("app.manifest", file("src/main/AndroidManifest.xml").absolutePath)
+            it.inputs.file(file("src/main/AndroidManifest.xml")).withPropertyName("manifest")
         }
     }
 }

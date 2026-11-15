@@ -9,4 +9,5 @@ Dada Blubb — Agent Guidance
 - Cover generator changes with seeded JVM tests for counts, unique stems, sound behavior, and connector boundaries/weights.
 - Default to the Medium Phone AVD, never Medium Tablet or a physical device. Inspect AVDs/ADB and resolve its serial dynamically; target Android tests explicitly at that serial.
 - Start Medium Phone if needed and wait for boot before installation/tests. Test on the emulator before a physical device; shut down only emulators started by you.
+- On an explicitly authorized populated physical device, use isolated test data; never run tests that clear, uninstall, or reset the user app or overwrite its active vocabulary.
 - Do not commit, tag, or push unless explicitly requested.

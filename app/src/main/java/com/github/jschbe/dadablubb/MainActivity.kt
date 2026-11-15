@@ -38,6 +38,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.lifecycle.ViewModelProvider
 import androidx.core.net.toUri
 import com.github.jschbe.dadablubb.core.*
+import com.github.jschbe.dadablubb.data.OutputError
 import com.github.jschbe.dadablubb.ui.theme.DadaBlubbTheme
 import kotlin.math.roundToInt
 
@@ -91,6 +92,7 @@ internal fun DadaBlubbApp(
     val workingLabel = stringResource(R.string.working)
     val appName = stringResource(R.string.app_name)
     val shareTitle = stringResource(R.string.share_title)
+    val outputState by model.outputState.collectAsState()
     var settingsVisible by rememberSaveable { mutableStateOf(false) }
     var menuVisible by remember { mutableStateOf(false) }
     var aboutVisible by rememberSaveable { mutableStateOf(false) }
@@ -151,7 +153,10 @@ internal fun DadaBlubbApp(
             )
             else GeneratorScreen(
                 settings = model.settings,
-                output = model.output,
+                output = outputState.text,
+                showOutputPlaceholder = outputState.showPlaceholder,
+                outputLoaded = outputState.loaded,
+                outputError = outputState.error,
                 enabled = model.ready,
                 maxWordCount = model.maxWordCount,
                 onSettings = model::updateSettings,
@@ -229,7 +234,10 @@ internal fun GeneratorScreen(
     onCopy: (String) -> Unit,
     onShare: (String) -> Unit,
     onOutputChange: (String) -> Unit,
-    maxWordCount: Int = 50
+    maxWordCount: Int = 50,
+    showOutputPlaceholder: Boolean = true,
+    outputLoaded: Boolean = true,
+    outputError: OutputError? = null
 ) {
     val focus = LocalFocusManager.current
     val decreaseLabel = stringResource(R.string.decrease_count)
@@ -296,7 +304,17 @@ internal fun GeneratorScreen(
             onValueChange = onOutputChange,
             modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp).testTag("output")
                 .semantics { contentDescription = outputLabel },
-            placeholder = { Text(stringResource(R.string.output_placeholder)) },
+            enabled = outputLoaded,
+            placeholder = if (showOutputPlaceholder) ({ Text(stringResource(R.string.output_placeholder)) }) else null,
+            isError = outputError != null,
+            supportingText = outputError?.let { error -> {
+                Text(stringResource(when (error) {
+                    OutputError.READ -> R.string.output_read_failed
+                    OutputError.WRITE -> R.string.output_write_failed
+                    OutputError.TOO_LARGE -> R.string.output_too_large
+                    OutputError.INVALID_TEXT -> R.string.output_invalid_text
+                }))
+            } },
             textStyle = MaterialTheme.typography.headlineSmall,
             minLines = 4,
             maxLines = 8

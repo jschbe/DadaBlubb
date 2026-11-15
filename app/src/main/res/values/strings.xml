@@ -131,4 +131,9 @@
         <item quantity="one">This dataset has %1$d unique stem. Word Count is limited to %1$d.</item>
         <item quantity="other">This dataset has %1$d unique stems. Word Count is limited to %1$d.</item>
     </plurals>
+    <string name="export_failed">Export did not finish. The destination document may be incomplete. Your active vocabulary is unchanged. Check access and storage, then export to a new document.</string>
+    <string name="output_read_failed">The saved output could not be read. It has not been overwritten. Edit or Generate to save a new result.</string>
+    <string name="output_write_failed">The current text could not be saved. Keep the app open and edit or Generate to retry; the previous saved output is kept.</string>
+    <string name="output_too_large">Text is limited to 64 KiB of UTF-8. The oversized change was not applied.</string>
+    <string name="output_invalid_text">This change contains invalid Unicode text and was not applied.</string>
 </resources>

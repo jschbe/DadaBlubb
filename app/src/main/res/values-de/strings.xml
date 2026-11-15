@@ -131,4 +131,9 @@
         <item quantity="one">Dieser Datensatz hat %1$d eindeutigen Wortstamm. Die Wortanzahl ist auf %1$d begrenzt.</item>
         <item quantity="other">Dieser Datensatz hat %1$d eindeutige Wortstämme. Die Wortanzahl ist auf %1$d begrenzt.</item>
     </plurals>
+    <string name="export_failed">Der Export wurde nicht abgeschlossen. Das Zieldokument kann unvollständig sein. Dein aktiver Wortschatz ist unverändert. Prüfe Zugriff und Speicherplatz und exportiere in ein neues Dokument.</string>
+    <string name="output_read_failed">Die gespeicherte Ausgabe konnte nicht gelesen werden. Sie wurde nicht überschrieben. Bearbeite den Text oder tippe auf Erzeugen, um ein neues Ergebnis zu speichern.</string>
+    <string name="output_write_failed">Der aktuelle Text konnte nicht gespeichert werden. Lass die App geöffnet und bearbeite den Text oder tippe zum erneuten Speichern auf Erzeugen. Die bisher gespeicherte Ausgabe bleibt erhalten.</string>
+    <string name="output_too_large">Der Text ist auf 64 KiB UTF-8 begrenzt. Die zu große Änderung wurde nicht übernommen.</string>
+    <string name="output_invalid_text">Diese Änderung enthält ungültigen Unicode-Text und wurde nicht übernommen.</string>
 </resources>

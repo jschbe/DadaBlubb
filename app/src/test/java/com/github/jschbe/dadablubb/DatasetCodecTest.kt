@@ -28,7 +28,7 @@ class DatasetCodecTest {
         assertEquals(50, dataset.maxWordCount)
         assertEquals(6, dataset.connectors.size)
         assertEquals(
-            mapOf("di" to 60, "de" to 5, "da" to 5, "didel" to 5, "eldi" to 5, "" to 20),
+            mapOf("di" to 60, "de" to 2, "da" to 6, "didel" to 6, "eldi" to 6, "" to 20),
             dataset.connectors.associate { it.text to it.weight }
         )
         assertEquals(100, dataset.connectors.sumOf { it.weight })
