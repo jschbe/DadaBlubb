@@ -1,44 +1,60 @@
-*.iml
+# Gradle and build outputs (all modules)
 .gradle
-/local.properties
+**/build/
+*.apk
+*.aab
+*.idsig
+.externalNativeBuild
+.cxx
+
+# Kotlin
+.kotlin/
+
+# Local Android SDK configuration
+local.properties
+
+# Android Studio
+*.iml
 /.idea/caches
 /.idea/libraries
 /.idea/modules.xml
 /.idea/workspace.xml
 /.idea/navEditor.xml
 /.idea/assetWizardSettings.xml
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
-local.properties
-
-# Build outputs (all modules)
-**/build/
-*.apk
-*.aab
-*.idsig
-
-# Kotlin
-.kotlin/
-
-# Android Studio
 /.idea/deploymentTargetSelector.xml
 /.idea/shelf/
 /.idea/inspectionProfiles/
+/captures
 
-# Signing
+# Editor temporary files
+*.swp
+*.swo
+
+# Operating system metadata
+.DS_Store
+
+# Private keys, certificates and signing configuration
+*.key
 *.jks
 *.keystore
+*.pem
+*.p8
 *.p12
 *.pfx
+id_rsa*
+id_ed25519*
 keystore.properties
 signing.properties
 key.properties
 
-# Environment / secrets
+# Service-account credentials
+service-account*.json
+*-service-account.json
+
+# Local environment secrets
 .env
 .env.*
+
+# Versionable templates must contain placeholders only.
 !.env.example
 !.env.sample

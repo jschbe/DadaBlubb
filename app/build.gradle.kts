@@ -4,17 +4,17 @@ plugins {
 }
 
 android {
-    namespace = "com.github.jschbe.dummlaberer"
+    namespace = "com.github.jschbe.dadablubb"
     compileSdk {
         version = release(37)
     }
 
     defaultConfig {
-        applicationId = "com.github.jschbe.dummlaberer"
+        applicationId = "com.github.jschbe.dadablubb"
         minSdk = 28
         targetSdk = 37
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -34,10 +34,19 @@ android {
     buildFeatures {
         compose = true
     }
+    // Language switching must also work offline after installation from an app bundle.
+    bundle {
+        language {
+            enableSplit = false
+        }
+    }
     testOptions {
         unitTests.all {
             it.systemProperty("dada.asset", file("src/main/assets/dada.json").absolutePath)
             it.inputs.file(file("src/main/assets/dada.json")).withPropertyName("bundledDada")
+            it.systemProperty("app.resources", file("src/main/res").absolutePath)
+            it.inputs.dir(file("src/main/res/values")).withPropertyName("englishResources")
+            it.inputs.dir(file("src/main/res/values-de")).withPropertyName("germanResources")
         }
     }
 }

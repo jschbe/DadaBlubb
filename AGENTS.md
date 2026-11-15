@@ -1,6 +1,6 @@
-Dummlaberer — Agent Guidance
-- Kotlin Android app with Jetpack Compose and Gradle Kotlin DSL; preserve minSdk = 28 and existing project versions and namespace.
-- UI and documentation in English; generated content is German-sounding dadaistic text.
+Dada Blubb — Agent Guidance
+- Kotlin Android app with Jetpack Compose and Gradle Kotlin DSL; preserve minSdk = 28 and existing project versions and namespace com.github.jschbe.dadablubb.
+- UI strings belong in English fallback and German Android resources; documentation is English. Generated content is German-sounding dadaistic text and is never translated.
 - Remain fully offline: no network, analytics or unnecessary dependencies.
 - Prefer simple maintainable design; keep generator and JSON validation testable without Android UI.
 - Word Count (1–50) counts word components, not characters or connectors. Connectors occur only between components.

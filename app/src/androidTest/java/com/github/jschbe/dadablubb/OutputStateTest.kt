@@ -1,4 +1,4 @@
-package com.github.jschbe.dummlaberer
+package com.github.jschbe.dadablubb
 
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -14,11 +14,11 @@ class OutputStateTest {
         compose.activityRule.scenario.recreate()
         compose.onNodeWithTag("output").assertTextEquals(edited)
         compose.waitUntil(10_000) {
-            compose.onAllNodesWithText("Generate").fetchSemanticsNodes().any {
+            compose.onAllNodesWithText(compose.activity.getString(R.string.generate)).fetchSemanticsNodes().any {
                 !it.config.contains(androidx.compose.ui.semantics.SemanticsProperties.Disabled)
             }
         }
-        compose.onNodeWithText("Generate").performScrollTo().performClick()
+        compose.onNodeWithText(compose.activity.getString(R.string.generate)).performScrollTo().performClick()
         compose.onNodeWithTag("output").assert(!hasText(edited)).assertIsNotFocused()
     }
 }

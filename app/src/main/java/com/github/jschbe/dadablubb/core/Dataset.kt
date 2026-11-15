@@ -1,4 +1,4 @@
-package com.github.jschbe.dummlaberer.core
+package com.github.jschbe.dadablubb.core
 
 import java.io.InputStream
 import java.io.ByteArrayOutputStream
@@ -6,6 +6,7 @@ import java.nio.ByteBuffer
 import java.nio.charset.CodingErrorAction
 import java.text.Normalizer
 import java.util.Locale
+import com.github.jschbe.dadablubb.core.DatasetTextKey.*
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.*
 
@@ -19,7 +20,6 @@ data class Dataset(val words: List<String>, val connectors: List<Connector>) {
 fun stemIdentity(stem: String): String =
     Normalizer.normalize(stem.trim().lowercase(Locale.ROOT), Normalizer.Form.NFC)
 
-class DatasetException(message: String) : IllegalArgumentException(message)
 
 /** Strict schema v1 JSON, with bounded input and nesting before parsing untrusted files. */
 object DatasetCodec {
@@ -37,65 +37,65 @@ object DatasetCodec {
             output.write(buffer, 0, count)
         }
         val bytes = output.toByteArray()
-        if (bytes.size > MAX_BYTES) invalid("JSON file must be at most 1 MiB.")
+        if (bytes.size > MAX_BYTES) invalid(SIZE)
         val text = try {
             Charsets.UTF_8.newDecoder()
                 .onMalformedInput(CodingErrorAction.REPORT)
                 .onUnmappableCharacter(CodingErrorAction.REPORT)
                 .decode(ByteBuffer.wrap(bytes)).toString()
         } catch (_: java.nio.charset.CharacterCodingException) {
-            invalid("JSON file must contain valid UTF-8 text.")
+            invalid(UTF8)
         }
         return parse(text)
     }
 
     fun parse(text: String): Dataset {
         if (text.length > MAX_BYTES || text.toByteArray(Charsets.UTF_8).size > MAX_BYTES) {
-            invalid("JSON file must be at most 1 MiB.")
+            invalid(SIZE)
         }
         checkNesting(text)
         val root = try {
             json.parseToJsonElement(text) as? JsonObject
-                ?: invalid("JSON root must be an object.")
+                ?: invalid(ROOT_OBJECT)
         } catch (_: SerializationException) {
-            invalid("Malformed JSON. Check quotes, commas and brackets.")
+            invalid(MALFORMED)
         } catch (_: IllegalArgumentException) {
-            invalid("Malformed JSON. Check quotes, commas and brackets.")
+            invalid(MALFORMED)
         }
-        keys(root, setOf("schemaVersion", "words", "connectors"), "Root")
-        if (integer(root["schemaVersion"], "schemaVersion") != 1) {
-            invalid("Unsupported schemaVersion. Expected 1.")
+        keys(root, setOf("schemaVersion", "words", "connectors"), datasetText(LABEL_ROOT))
+        if (integer(root["schemaVersion"], datasetText(LABEL_SCHEMA)) != 1) {
+            invalid(SCHEMA)
         }
-        val words = (root["words"] as? JsonArray ?: invalid("words must be an array."))
-            .mapIndexed { index, entry -> string(entry, "Word ${index + 1}") }
+        val words = (root["words"] as? JsonArray ?: invalid(WORDS_ARRAY))
+            .mapIndexed { index, entry -> string(entry, datasetText(LABEL_WORD, index + 1)) }
         val connectors = (root["connectors"] as? JsonArray
-            ?: invalid("connectors must be an array.")).mapIndexed { index, entry ->
-            val item = entry as? JsonObject ?: invalid("Connector ${index + 1} must be an object.")
-            keys(item, setOf("text", "weight"), "Connector ${index + 1}")
-            Connector(string(item["text"], "Connector text"), integer(item["weight"], "Connector weight"))
+            ?: invalid(CONNECTORS_ARRAY)).mapIndexed { index, entry ->
+            val item = entry as? JsonObject ?: invalid(CONNECTOR_OBJECT, index + 1)
+            keys(item, setOf("text", "weight"), datasetText(LABEL_CONNECTOR, index + 1))
+            Connector(string(item["text"], datasetText(LABEL_TEXT)), integer(item["weight"], datasetText(LABEL_WEIGHT)))
         }
         return Dataset(words, connectors).also {
             validate(it)
             if (encode(it).toByteArray(Charsets.UTF_8).size > MAX_BYTES) {
-                invalid("Dataset is too large when formatted for export; use fewer or shorter entries.")
+                invalid(EXPORT_SIZE)
             }
         }
     }
 
     fun validate(dataset: Dataset) {
-        if (dataset.words.size !in 1..MAX_WORDS) invalid("Provide 1–$MAX_WORDS words.")
-        if (dataset.connectors.size !in 1..MAX_CONNECTORS) invalid("Provide 1–$MAX_CONNECTORS connectors.")
-        dataset.words.forEachIndexed { index, word -> validateText(word, 64, false, "Word ${index + 1}") }
-        if (dataset.words.distinct().size != dataset.words.size) invalid("Words must be distinct; remove duplicates.")
+        if (dataset.words.size !in 1..MAX_WORDS) invalid(WORD_COUNT, MAX_WORDS)
+        if (dataset.connectors.size !in 1..MAX_CONNECTORS) invalid(CONNECTOR_COUNT, MAX_CONNECTORS)
+        dataset.words.forEachIndexed { index, word -> validateText(word, 64, false, datasetText(LABEL_WORD, index + 1)) }
+        if (dataset.words.distinct().size != dataset.words.size) invalid(WORD_DUPLICATES)
         dataset.connectors.forEachIndexed { index, connector ->
-            validateText(connector.text, 32, true, "Connector ${index + 1}")
-            if (connector.weight <= 0) invalid("Every connector weight must be a positive integer.")
+            validateText(connector.text, 32, true, datasetText(LABEL_CONNECTOR, index + 1))
+            if (connector.weight <= 0) invalid(POSITIVE_WEIGHT)
         }
         if (dataset.connectors.map { it.text }.distinct().size != dataset.connectors.size) {
-            invalid("Connector texts must be distinct; remove duplicates.")
+            invalid(CONNECTOR_DUPLICATES)
         }
         val total = dataset.connectors.sumOf { it.weight.toLong() }
-        if (total !in 1..Int.MAX_VALUE.toLong()) invalid("Total connector weight must not exceed 2147483647.")
+        if (total !in 1..Int.MAX_VALUE.toLong()) invalid(TOTAL_WEIGHT)
     }
 
     fun encode(dataset: Dataset): String {
@@ -115,9 +115,9 @@ object DatasetCodec {
         return json.encodeToString(JsonElement.serializer(), root) + "\n"
     }
 
-    private fun validateText(value: String, max: Int, allowEmpty: Boolean, label: String) {
+    private fun validateText(value: String, max: Int, allowEmpty: Boolean, label: DatasetText) {
         if ((!allowEmpty && value.isEmpty()) || value.codePointCount(0, value.length) > max) {
-            invalid("$label must contain ${if (allowEmpty) "0" else "1"}–$max characters.")
+            invalid(TEXT_LENGTH, label, if (allowEmpty) 0 else 1, max)
         }
         // Letters and combining accents preserve Unicode, including supplementary letters.
         // Reject whitespace, controls, invisible formatting, punctuation and unpaired surrogates.
@@ -126,23 +126,23 @@ object DatasetCodec {
                     Character.NON_SPACING_MARK.toInt(), Character.COMBINING_SPACING_MARK.toInt()
                 )
             } || (value.isNotEmpty() && !Character.isLetter(value.codePointAt(0)))) {
-            invalid("$label must contain only letters and accents, starting with a letter; no whitespace.")
+            invalid(LETTERS, label)
         }
     }
 
-    private fun string(value: JsonElement?, label: String): String =
-        (value as? JsonPrimitive)?.takeIf { it.isString }?.content ?: invalid("$label must be a string.")
+    private fun string(value: JsonElement?, label: DatasetText): String =
+        (value as? JsonPrimitive)?.takeIf { it.isString }?.content ?: invalid(STRING, label)
 
-    private fun integer(value: JsonElement?, label: String): Int {
-        val primitive = value as? JsonPrimitive ?: invalid("$label must be an integer.")
+    private fun integer(value: JsonElement?, label: DatasetText): Int {
+        val primitive = value as? JsonPrimitive ?: invalid(INTEGER, label)
         if (primitive.isString || !Regex("-?(0|[1-9][0-9]*)").matches(primitive.content)) {
-            invalid("$label must be an integer.")
+            invalid(INTEGER, label)
         }
-        return primitive.intOrNull ?: invalid("$label is outside the supported integer range.")
+        return primitive.intOrNull ?: invalid(INTEGER_RANGE, label)
     }
 
-    private fun keys(value: JsonObject, expected: Set<String>, label: String) {
-        if (value.keys != expected) invalid("$label must have exactly these fields: ${expected.joinToString()}.")
+    private fun keys(value: JsonObject, expected: Set<String>, label: DatasetText) {
+        if (value.keys != expected) invalid(FIELDS, label, expected.joinToString())
     }
 
     private fun checkNesting(text: String) {
@@ -163,26 +163,27 @@ object DatasetCodec {
                         val key = try {
                             (json.parseToJsonElement(text.substring(stringStart, index + 1)) as JsonPrimitive).content
                         } catch (_: Exception) {
-                            invalid("Malformed JSON object key.")
+                            invalid(OBJECT_KEY)
                         }
-                        if (objectKeys.lastOrNull()?.add(key) == false) invalid("Duplicate JSON fields are not allowed.")
+                        if (objectKeys.lastOrNull()?.add(key) == false) invalid(DUPLICATE_KEYS)
                     }
                 }
-                else if (char < ' ') invalid("Malformed JSON: unescaped control character.")
+                else if (char < ' ') invalid(CONTROL)
             } else when (char) {
                 '"' -> { quoted = true; stringStart = index }
                 '{', '[' -> {
-                    if (++depth > 4) invalid("JSON nesting is too deep for schema v1.")
+                    if (++depth > 4) invalid(NESTING)
                     objectKeys.add(if (char == '{') mutableSetOf() else null)
                 }
                 '}', ']' -> {
-                    if (--depth < 0) invalid("Malformed JSON: unmatched bracket.")
+                    if (--depth < 0) invalid(BRACKET)
                     objectKeys.removeAt(objectKeys.lastIndex)
                 }
             }
         }
-        if (quoted || depth != 0) invalid("Malformed JSON: incomplete string or object.")
+        if (quoted || depth != 0) invalid(INCOMPLETE)
     }
 
-    private fun invalid(message: String): Nothing = throw DatasetException(message)
+    private fun invalid(key: DatasetTextKey, vararg arguments: Any): Nothing =
+        throw DatasetException(datasetText(key, *arguments))
 }

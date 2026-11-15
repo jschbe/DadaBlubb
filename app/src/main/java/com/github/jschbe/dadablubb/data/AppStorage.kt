@@ -1,8 +1,8 @@
-package com.github.jschbe.dummlaberer.data
+package com.github.jschbe.dadablubb.data
 
 import android.content.Context
 import androidx.core.content.edit
-import com.github.jschbe.dummlaberer.core.GeneratorSettings
+import com.github.jschbe.dadablubb.core.GeneratorSettings
 
 /** Small local preferences need no database or additional persistence dependency. */
 class SettingsStorage(context: Context) {

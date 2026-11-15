@@ -1,22 +1,24 @@
-package com.github.jschbe.dummlaberer
+package com.github.jschbe.dadablubb
 
 import android.app.Application
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.espresso.Espresso.closeSoftKeyboard
 import androidx.test.platform.app.InstrumentationRegistry
-import com.github.jschbe.dummlaberer.core.*
-import com.github.jschbe.dummlaberer.ui.theme.DummlabererTheme
+import com.github.jschbe.dadablubb.core.*
+import com.github.jschbe.dadablubb.ui.theme.DadaBlubbTheme
 import kotlin.random.Random
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -28,7 +30,7 @@ class AppUiTest {
     @Test fun exactCountControlsAndEmptyOutputActions() {
         var settings by mutableStateOf(GeneratorSettings())
         compose.setContent {
-            DummlabererTheme {
+            EnglishTestUi {
                 GeneratorScreen(settings, "", true, { settings = it }, {}, {}, {}, {})
             }
         }
@@ -54,7 +56,7 @@ class AppUiTest {
         var copied = ""
         var shared = ""
         compose.setContent {
-            DummlabererTheme {
+            EnglishTestUi {
                 GeneratorScreen(settings, output, true, {},
                     { output = Generator(Random(1)).generate(dataset, settings).text },
                     { copied = it }, { shared = it }, { output = it })
@@ -74,7 +76,7 @@ class AppUiTest {
         val generated = "Möterdiröngel"
         val edited = "First edited line\n" + "Schnurpsel ".repeat(180) + "\nLast line"
         compose.setContent {
-            DummlabererTheme {
+            EnglishTestUi {
                 GeneratorScreen(GeneratorSettings(), output, true, {}, { output = generated },
                     { copied = it }, { shared = it }, { output = it })
             }
@@ -111,7 +113,7 @@ class AppUiTest {
                 }
             }
             CompositionLocalProvider(LocalContext provides capturingContext) {
-                DummlabererTheme { DummlabererApp(model, "test") }
+                EnglishTestUi { DadaBlubbApp(model, AppVersion("test", 42)) }
             }
         }
         compose.waitUntil(10_000) { model.ready }
@@ -136,7 +138,7 @@ class AppUiTest {
 
     @Test fun settingsRadioControlsUpdateOneSettingsValue() {
         var settings by mutableStateOf(GeneratorSettings())
-        compose.setContent { DummlabererTheme { SettingsScreen(settings) { settings = it } } }
+        compose.setContent { EnglishTestUi { SettingsScreen(settings, { settings = it }) } }
         compose.onNodeWithText("Rhythmic").performScrollTo().performClick()
         compose.onNodeWithText("Rhythmic").assertIsSelected()
         compose.onNodeWithText("High").performScrollTo().performClick()
@@ -150,7 +152,7 @@ class AppUiTest {
         val source = Dataset(listOf("Möter", "MÖTER"), listOf(Connector("di", 1)))
         val settings = GeneratorSettings(8).cappedTo(source)
         compose.setContent {
-            DummlabererTheme {
+            EnglishTestUi {
                 GeneratorScreen(settings, "", true, {}, {}, {}, {}, {}, maxWordCount = source.maxWordCount)
             }
         }
@@ -159,5 +161,21 @@ class AppUiTest {
         compose.onNodeWithContentDescription("Increase word count").assertIsNotEnabled()
         compose.onNodeWithContentDescription("Word Count").assertIsNotEnabled()
         compose.onNodeWithText("This dataset has 1 unique stem. Word Count is limited to 1.").assertExists()
+    }
+}
+
+/** Fixtures stay deterministic without changing the phone's system or application locale. */
+@Composable
+internal fun EnglishTestUi(content: @Composable () -> Unit) {
+    val base = LocalContext.current
+    val localized = remember(base) {
+        val localizedResources = AppLocales.localizedContext(base, AppLanguage.ENGLISH).resources
+        object : ContextWrapper(base) {
+            override fun getResources() = localizedResources
+        }
+    }
+    CompositionLocalProvider(LocalContext provides localized,
+        LocalConfiguration provides localized.resources.configuration) {
+        DadaBlubbTheme(content = content)
     }
 }

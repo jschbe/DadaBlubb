@@ -1,12 +1,12 @@
-package com.github.jschbe.dummlaberer
+package com.github.jschbe.dadablubb
 
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.SharedPreferences
 import androidx.test.platform.app.InstrumentationRegistry
-import com.github.jschbe.dummlaberer.core.*
-import com.github.jschbe.dummlaberer.data.DatasetStorage
-import com.github.jschbe.dummlaberer.data.SettingsStorage
+import com.github.jschbe.dadablubb.core.*
+import com.github.jschbe.dadablubb.data.DatasetStorage
+import com.github.jschbe.dadablubb.data.SettingsStorage
 import java.io.File
 import java.util.UUID
 import org.junit.Assert.*

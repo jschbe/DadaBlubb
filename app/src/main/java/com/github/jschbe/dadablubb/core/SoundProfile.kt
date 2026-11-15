@@ -1,4 +1,4 @@
-package com.github.jschbe.dummlaberer.core
+package com.github.jschbe.dadablubb.core
 
 import java.text.Normalizer
 

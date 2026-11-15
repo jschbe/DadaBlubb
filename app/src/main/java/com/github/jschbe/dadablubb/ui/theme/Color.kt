@@ -1,4 +1,4 @@
-package com.github.jschbe.dummlaberer.ui.theme
+package com.github.jschbe.dadablubb.ui.theme
 
 import androidx.compose.ui.graphics.Color
 

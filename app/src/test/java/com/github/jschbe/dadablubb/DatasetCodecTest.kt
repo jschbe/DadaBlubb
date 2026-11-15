@@ -1,6 +1,6 @@
-package com.github.jschbe.dummlaberer
+package com.github.jschbe.dadablubb
 
-import com.github.jschbe.dummlaberer.core.*
+import com.github.jschbe.dadablubb.core.*
 import java.io.ByteArrayInputStream
 import java.io.File
 import org.junit.Assert.*

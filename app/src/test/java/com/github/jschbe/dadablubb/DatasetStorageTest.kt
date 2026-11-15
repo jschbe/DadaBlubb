@@ -1,7 +1,7 @@
-package com.github.jschbe.dummlaberer
+package com.github.jschbe.dadablubb
 
-import com.github.jschbe.dummlaberer.core.*
-import com.github.jschbe.dummlaberer.data.DatasetStorage
+import com.github.jschbe.dadablubb.core.*
+import com.github.jschbe.dadablubb.data.DatasetStorage
 import java.io.File
 import java.io.IOException
 import org.junit.Assert.*
