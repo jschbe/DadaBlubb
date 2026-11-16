@@ -32,7 +32,8 @@ class PreferencesUiTest {
                     appearance, { appearance = it }, language, { language = it })
             }
         }
-        compose.onNodeWithTag("about-entry").assertIsDisplayed()
+        compose.onNodeWithTag("about-entry").assertDoesNotExist()
+        compose.onNodeWithText("Appearance").assertIsDisplayed()
         compose.onNodeWithTag("appearance-LIGHT").performScrollTo().performClick().assertIsSelected()
         compose.onNodeWithTag("language-GERMAN").performScrollTo().performClick().assertIsSelected()
         compose.runOnIdle { assertEquals(Appearance.LIGHT, appearance); assertEquals(AppLanguage.GERMAN, language) }

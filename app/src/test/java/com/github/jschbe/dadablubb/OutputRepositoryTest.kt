@@ -1,6 +1,7 @@
 package com.github.jschbe.dadablubb
 
 import com.github.jschbe.dadablubb.data.*
+import com.github.jschbe.dadablubb.core.Generation
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.CountDownLatch
@@ -16,6 +17,29 @@ class OutputRepositoryTest {
     @get:Rule val folder = TemporaryFolder()
     private suspend fun settled(repo: OutputRepository): OutputState =
         withTimeout(5_000) { repo.state.first { it.loaded && !it.saving } }
+
+    @Test fun structuralHintsAreEphemeralAndEveryAcceptedEditDiscardsThem() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val disk = OutputStorage(File(folder.root, "output.txt"))
+        val generated = Generation(listOf("Didi", "Möter", "Röngel"), listOf("di", ""))
+        try {
+            val repo = OutputRepository(disk, scope)
+            settled(repo)
+            repo.update(generated)
+            assertEquals(generated, settled(repo).generation)
+            assertEquals(generated.text, disk.read())
+            val restarted = OutputRepository(disk, scope)
+            assertEquals(generated.text, settled(restarted).text)
+            assertNull(restarted.state.value.generation)
+            repo.update(generated.text + "di")
+            assertNull(settled(repo).generation)
+            assertEquals(generated.text + "di", disk.read())
+            repo.update(generated)
+            settled(repo)
+            repo.update(generated.text) // even replacement with identical characters cannot infer structure
+            assertNull(settled(repo).generation)
+        } finally { scope.cancel() }
+    }
 
     @Test fun firstStartSavedEmptyAndGenerateReplacementHaveDifferentStates() = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)

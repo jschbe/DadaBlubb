@@ -39,7 +39,14 @@ class LocaleThemeStateTest {
             waitForText("Einstellungen")
             compose.onNodeWithTag("language-GERMAN").assertIsSelected()
             compose.onNodeWithTag("appearance-DARK").assertIsSelected()
-            compose.onNodeWithTag("about-entry").performScrollTo().performClick()
+            compose.onNodeWithContentDescription("Weitere Optionen").performClick()
+            // Popups use their Android window's resources: check German in the real locale test.
+            val menuPositions = listOf("Über die App", "Einstellungen", "JSON importieren",
+                "JSON exportieren", "Standard wiederherstellen").map {
+                compose.onNode(hasText(it) and hasAnyAncestor(isPopup())).fetchSemanticsNode().boundsInRoot.top
+            }
+            assertTrue(menuPositions.zipWithNext().all { (a, b) -> a < b })
+            compose.onNodeWithTag("about-entry").performClick()
             compose.onNode(hasText("Über die App") and hasAnyAncestor(isDialog())).assertExists()
             val info = context.packageManager.getPackageInfo(context.packageName, 0)
             compose.onNodeWithText("Version ${info.versionName} (Code ${info.longVersionCode})")

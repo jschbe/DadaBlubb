@@ -28,6 +28,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -113,7 +114,10 @@ internal fun DadaBlubbApp(
                     if (settingsVisible) IconButton(
                         onClick = { settingsVisible = false },
                         modifier = Modifier.semantics { contentDescription = backLabel }
-                    ) { Text(stringResource(R.string.back_symbol), fontSize = 26.sp) }
+                    ) {
+                        Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = null,
+                            modifier = Modifier.size(24.dp).testTag("settings-back-icon"))
+                    }
                 },
                 actions = {
                     Box {
@@ -122,6 +126,11 @@ internal fun DadaBlubbApp(
                             modifier = Modifier.semantics { contentDescription = moreOptionsLabel }
                         ) { Text(stringResource(R.string.menu_symbol), fontSize = 28.sp) }
                         DropdownMenu(expanded = menuVisible, onDismissRequest = { menuVisible = false }) {
+                            DropdownMenuItem(text = { Text(stringResource(R.string.about_app)) },
+                                modifier = Modifier.testTag("about-entry"), onClick = {
+                                    menuVisible = false
+                                    aboutVisible = true
+                                })
                             DropdownMenuItem(text = { Text(stringResource(R.string.settings)) }, onClick = {
                                 menuVisible = false
                                 settingsVisible = true
@@ -148,12 +157,12 @@ internal fun DadaBlubbApp(
             if (model.busy) LinearProgressIndicator(Modifier.fillMaxWidth().semantics { contentDescription = workingLabel })
             if (settingsVisible) SettingsScreen(
                 model.settings, model::updateSettings,
-                model.appearance, model::updateAppearance, language, onLanguage,
-                onAbout = { aboutVisible = true }
+                model.appearance, model::updateAppearance, language, onLanguage
             )
             else GeneratorScreen(
                 settings = model.settings,
                 output = outputState.text,
+                generation = outputState.generation,
                 showOutputPlaceholder = outputState.showPlaceholder,
                 outputLoaded = outputState.loaded,
                 outputError = outputState.error,
@@ -237,7 +246,8 @@ internal fun GeneratorScreen(
     maxWordCount: Int = 50,
     showOutputPlaceholder: Boolean = true,
     outputLoaded: Boolean = true,
-    outputError: OutputError? = null
+    outputError: OutputError? = null,
+    generation: Generation? = null
 ) {
     val focus = LocalFocusManager.current
     val decreaseLabel = stringResource(R.string.decrease_count)
@@ -302,6 +312,9 @@ internal fun GeneratorScreen(
         OutlinedTextField(
             value = output,
             onValueChange = onOutputChange,
+            visualTransformation = remember(generation) {
+                generation?.let(::StemBoundaryTransformation) ?: androidx.compose.ui.text.input.VisualTransformation.None
+            },
             modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp).testTag("output")
                 .semantics { contentDescription = outputLabel },
             enabled = outputLoaded,
@@ -333,17 +346,12 @@ internal fun SettingsScreen(
     appearance: Appearance = Appearance.SYSTEM,
     onAppearance: (Appearance) -> Unit = {},
     language: AppLanguage = AppLanguage.SYSTEM,
-    onLanguage: (AppLanguage) -> Unit = {},
-    onAbout: () -> Unit = {}
+    onLanguage: (AppLanguage) -> Unit = {}
 ) {
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        OutlinedCard(onClick = onAbout, modifier = Modifier.fillMaxWidth().testTag("about-entry")) {
-            Text(stringResource(R.string.about_app), modifier = Modifier.padding(16.dp),
-                style = MaterialTheme.typography.titleMedium)
-        }
         SettingGroup(stringResource(R.string.appearance), stringResource(R.string.appearance_help),
             Appearance.entries, appearance, { stringResource(when (it) {
                 Appearance.SYSTEM -> R.string.system_default

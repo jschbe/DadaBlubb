@@ -70,7 +70,7 @@ class AppViewModel @JvmOverloads constructor(
     }
 
     fun generate() {
-        if (ready) outputStore.update(generator.generate(checkNotNull(dataset), settings).text)
+        if (ready) outputStore.update(generator.generate(checkNotNull(dataset), settings))
     }
 
     fun editOutput(value: String) { outputStore.update(value) }

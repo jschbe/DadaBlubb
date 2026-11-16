@@ -1,6 +1,6 @@
 # Dada Blubb
 
-Dada Blubb 1.2.0 is an offline Android playground for absurd, rhythmic,
+Dada Blubb 1.2.1 (versionCode 4) is an offline Android playground for absurd, rhythmic,
 German-sounding fantasy words, built with Kotlin and Material 3 Jetpack Compose.
 The interface supports German and English, persistent System default / Light /
 Dark themes, and Android dynamic colors. Gradle's root project is **DadaBlubb**;
@@ -11,16 +11,17 @@ The local checkout directory can retain its existing name.
 
 ## Installation identity and existing data
 
-This pre-upload naming cleanup changes the historical applicationId
+The earlier pre-upload naming cleanup changed the historical applicationId
 `com.github.jschbe.dummlaberer` to `com.github.jschbe.dadablubb`. Android treats it
 as a **separate installation**, not an update of the old app, even though the
-visible name and version **1.2.0 / code 3** are unchanged. Keep the old app and
+visible name and version **1.2.0 / code 3** were unchanged at that time. Keep the old app and
 its data. Nothing is automatically migrated, reset, cleared or uninstalled.
 The new app starts with the bundled vocabulary and its own preferences. If custom
 vocabulary is needed, separately export it from the old app and explicitly import
 it into the new one. Generated/edited output can be copied or shared separately;
-settings are independent. Future upgrades using the new applicationId preserve
-the new app's data in the usual way.
+settings are independent. The v1.2.1 update keeps the v1.2.0 Google Play
+applicationId `com.github.jschbe.dadablubb` and preserves its settings, active
+vocabulary and saved output without migration.
 
 ## Features
 
@@ -35,8 +36,8 @@ the new app's data in the usual way.
 - One curated default asset containing 449 unique stems and weighted connectors.
 - Complete dataset import/export through Android's document picker and a
   confirmed reset that keeps settings.
-- Settings starts with **About App**, followed by **Appearance**, **Language**,
-  and the existing generation settings. About shows installed versionName and
+- The overflow menu starts with **About App**. Settings starts with **Appearance**,
+  followed by **Language** and the existing generation settings. About shows installed versionName and
   versionCode, copyright, GPL-3.0-only, the Codex credit and a source link.
 
 The supplied launcher artwork is preserved in
@@ -86,6 +87,87 @@ gradlew.bat --offline installDebug
 `installDebug` requires a connected device/emulator with debugging enabled.
 The APK is `app/build/outputs/apk/debug/app-debug.apk`.
 
+## Google Play upload signing (manual release step)
+
+Release signing is prepared for **1.2.1 / code 4**, applicationId
+`com.github.jschbe.dadablubb`. No signed release has been built or uploaded as
+part of this preparation. All four environment variables are required:
+
+| Variable | Value supplied by the user |
+| --- | --- |
+| `DADABLUBB_UPLOAD_STORE_FILE` | Absolute path: `/home/codex/.config/android-signing/play-upload.jks` |
+| `DADABLUBB_UPLOAD_STORE_PASSWORD` | Private keystore password |
+| `DADABLUBB_UPLOAD_KEY_ALIAS` | `play-upload` |
+| `DADABLUBB_UPLOAD_KEY_PASSWORD` | Private key password |
+
+There are no password defaults or local signing-property files. Missing or blank
+variables fail release validation with their **names only**, before release
+packaging; there is no unsigned/debug-key fallback. Debug builds and JVM tests
+work without these variables. The standalone
+`:app:validateReleaseSigningEnvironment` task checks presence only; it never
+opens the keystore or proves that passwords/the alias are correct.
+
+The user must supply passwords manually **outside Codex**, in a private local
+terminal. Never put them in commands, shell history, source files,
+`gradle.properties`, `local.properties`, logs or chat. Keep shell tracing off;
+do not use verbose/debug Gradle logging, build scans or signing reports with
+credentials present. Configuration caching is rejected while any upload-signing
+variable is supplied, because AGP's signing configuration contains passwords.
+Use `--no-configuration-cache` and `--no-daemon` for the manual build.
+
+Later, from the repository root, the user can run this **Bash** block themselves.
+Silent prompts avoid echo/history; the subshell limits the variables' lifetime:
+
+```bash
+(
+  set +x
+  set -e
+  export DADABLUBB_UPLOAD_STORE_FILE=/home/codex/.config/android-signing/play-upload.jks
+  export DADABLUBB_UPLOAD_KEY_ALIAS=play-upload
+  read -r -s -p 'Upload keystore password: ' DADABLUBB_UPLOAD_STORE_PASSWORD
+  printf '\n'
+  read -r -s -p 'Upload key password: ' DADABLUBB_UPLOAD_KEY_PASSWORD
+  printf '\n'
+  export DADABLUBB_UPLOAD_STORE_PASSWORD DADABLUBB_UPLOAD_KEY_PASSWORD
+  ./gradlew --offline --no-daemon --no-configuration-cache :app:clean :app:bundleRelease
+)
+```
+
+The pinned wrapper, JDK, SDK and dependencies must already be available offline.
+Use only the output of a **successful fresh build**:
+`app/build/outputs/bundle/release/app-release.aab`. A failed invocation does not
+validate any older artifact left on disk. The command gives a repeatable build
+procedure; byte-for-byte artifact reproducibility has not been established.
+
+After that build, verify the **AAB only**, without opening the private keystore
+or providing passwords (JDK tools plus an independently available `bundletool`):
+
+```sh
+aab=app/build/outputs/bundle/release/app-release.aab
+jarsigner -verify -verbose -certs "$aab"
+keytool -printcert -jarfile "$aab"
+java -jar /path/to/bundletool-all.jar validate --bundle="$aab"
+java -jar /path/to/bundletool-all.jar dump manifest --bundle="$aab" --module=base
+```
+
+Require `jar verified`, signed payload entries and no unsigned-content or
+signature-integrity warnings. Self-signed certificate/trust-chain warnings are
+normal for an upload certificate; verification alone does not establish signer
+identity. Compare the public certificate's SHA-256 fingerprint with the trusted
+**upload certificate** in Play Console. These commands show only package content
+and public certificate information, never private keys/passwords. Do not use
+`keytool -list` against the private keystore. Check the manifest for package
+`com.github.jschbe.dadablubb`, versionName `1.2.1`, versionCode `4`, minSdk `28`
+and targetSdk `37`. AABs use JAR signing; `apksigner` is for APKs.
+
+The **upload key** authenticates the AAB submitted to Google Play. With Play App
+Signing, Google signs the APKs delivered to users with the separate **app-signing
+key**; its certificate may differ from the upload certificate. Securely back up
+the shared upload keystore and store its passwords separately in protected
+storage outside this repository. The keystore must remain private and must not
+be committed. Play enrollment, the real signed build, certificate comparison
+and any Internal Testing upload remain manual follow-up steps.
+
 ## Usage
 
 1. Set **Word Count** with the slider or precise − / + controls.
@@ -95,9 +177,9 @@ The APK is `app/build/outputs/apk/debug/app-debug.apk`.
    when editing, without an automatic focus request on launch or generation.
    **Copy** / **Share** use the entire current field, including edits and newlines.
    These actions are disabled when the field is empty. **Generate** replaces edits.
-4. The three-dot menu contains **Settings**, **Import JSON**, **Export JSON**,
-   and **Reset to Defaults**, in that order. **About App** is the first entry
-   inside Settings; it is not duplicated in the menu.
+4. The three-dot menu contains **About App**, **Settings**, **Import JSON**,
+   **Export JSON**, and **Reset to Defaults**, in that order. Settings uses a
+   centered Material back-arrow vector with a localized accessibility label.
 
 Settings save automatically. Generation settings apply to the next generation;
 changing them or the vocabulary does not rewrite the current result. Appearance
@@ -145,6 +227,25 @@ language splitting (`bundle.language.enableSplit = false`) so both UI languages
 remain available offline after a Play installation.
 
 ## Saved output
+
+Freshly generated text prefers visual wrapping between the selected stems.
+Each connector stays with the following stem, including when the connector is
+empty. A stem/connector segment too wide for the field can still wrap normally.
+The editable field keeps its existing 4–8 visible lines and internal scrolling.
+
+The existing value-based Material 3 editor uses `VisualTransformation` with
+explicit UTF-16 cursor mappings. U+200B soft break hints exist **only in the
+rendered text**, never in the generator's canonical text, editor input/IME,
+selection clipboard, Copy/Share payloads, output file or vocabulary JSON.
+No spaces or hyphens are appended. This uses the pinned Compose Foundation
+1.10.4 / Material 3 1.4.0 APIs without an editor migration or new dependencies.
+See [Compose text-field transformations](https://developer.android.com/develop/ui/compose/text/user-input).
+
+Boundary metadata stays in the process-owned output repository through activity
+recreation. The first accepted text edit discards it completely; edited text
+then uses standard wrapping, even if an undo restores the same characters.
+Cold-loaded output also uses standard wrapping because only canonical text is
+persisted. Boundaries are never guessed from substrings such as `di`.
 
 The current generated or edited text is stored locally in `files/output.txt` as
 UTF-8, capped at **64 KiB of encoded text**. New edits update the UI immediately.
@@ -266,8 +367,12 @@ and Pömpel. Example schema v1:
 }
 ```
 
-The bundled connector weights sum to **100**. This weight update preserves all
-449 stems in their original order and leaves schema v1 and generator logic unchanged.
+The bundled connector weights remain **di:60, de:2, da:6, didel:6, eldi:6, empty:20**,
+summing to **100**. In v1.2.1, exactly `Pimper` is replaced with `Pomper` in its
+existing slot. The vocabulary still contains 449 distinct stems; all other words,
+their order, connectors, weights, schema v1 and generator algorithms are unchanged.
+Saved/imported vocabularies continue to override the bundled defaults and are never
+silently rewritten. Existing generated/edited output is also preserved.
 
 Validation rejects invalid content with localized English/German errors:
 
@@ -329,7 +434,7 @@ document IO runs through the ViewModel on `Dispatchers.IO`; output writes use a
 separate process-owned IO scope. Namespace and applicationId are
 `com.github.jschbe.dadablubb`. MinSdk 28, SDK/tool versions, generator behavior,
 all 449 stems and original artwork are preserved. Default connector weights are
-documented above. VersionName is **1.2.0**, versionCode **3**. No dependency was added or
+documented above. VersionName is **1.2.1**, versionCode **4**. No dependency was added or
 substituted for this milestone. There is no backend, DI framework or database.
 
 ## Tests and verification
@@ -393,7 +498,84 @@ Reports: `app/build/reports/tests/testDebugUnitTest/`,
 `app/build/reports/androidTests/connected/debug/`, and
 `app/build/reports/lint-results-debug.html`.
 
-### Review fixes DB-01–DB-06 verification
+### Milestone v1.2.1 verification (2026-11-16)
+
+This UI verification preceded the single-stem correction documented above.
+
+Implemented **1.2.1 / code 4** as a debug-only implementation/verification pass.
+The pre-existing uncommitted signing configuration and documentation were
+preserved (documentation version references now match 1.2.1). No release signing
+credentials, release AAB, Play upload, Git commit/tag/push or physical device was
+used. ApplicationId, minSdk, pinned dependencies, all 449 stems, connector weights,
+selection algorithms, JSON schema, storage formats and backup rules are unchanged.
+
+| Changed files | Purpose |
+| --- | --- |
+| `MainActivity.kt`, `res/drawable/ic_arrow_back.xml` | About first in overflow; remove Settings entry; centered 24 dp navigation vector; connect display transformation |
+| `res/values/strings.xml`, `res/values-de/strings.xml` | Remove the unused back-arrow glyph; retain both localized accessibility labels and all About strings |
+| `core/Generator.kt`, `StemBoundaryTransformation.kt` | Expose structural UTF-16 boundaries; display-only break hints with explicit cursor mappings; preserve canonical casing/text |
+| `AppViewModel.kt`, `data/OutputRepository.kt` | Carry Generation metadata in memory; discard on accepted edits; persist only the original text |
+| `app/build.gradle.kts`, `README.md` | Version metadata and behavior/verification documentation |
+| `StemBoundaryTransformationTest.kt`, `OutputRepositoryTest.kt` | Seeded structural, Unicode, mapping and persistence regression tests |
+| `MilestoneNavigationUiTest.kt`, `OutputWrappingUiTest.kt`, `AppUiTest.kt`, `PreferencesUiTest.kt`, `LocaleThemeStateTest.kt` | Focused navigation, layout, editing and payload checks; update About location; synchronize keyboard/clipboard transitions |
+
+Final successful wrapper invocation, offline, with `ANDROID_HOME` set to the
+installed SDK and `ANDROID_SERIAL` set to the dynamically identified, booted
+**medium_phone / emulator-5554 / Android 16 API 36**:
+
+```sh
+./gradlew --offline --no-configuration-cache testDebugUnitTest \
+  :app:compileDebugAndroidTestKotlin lintDebug assembleDebug \
+  :app:assembleDebugAndroidTest connectedDebugAndroidTest
+```
+
+| Check | Final result |
+| --- | --- |
+| JVM tests | 72 passed; 0 failures/errors/skips |
+| Medium Phone instrumentation/UI tests | 22 passed; 0 failures/errors/skips |
+| Android test compilation, debug APK/test APK assembly | Successful |
+| Lint | 0 errors; 6 existing warnings; no new warnings or suppressions |
+
+Remaining Lint warnings: `UnusedAttribute` (1, API 33 localeConfig with the
+existing older-API locale implementation), `IconXmlAndPng` (2),
+`MonochromeLauncherIcon` (2), and `UseKtx` (1, existing preference code).
+The test tooling also prints a protobuf/JDK `sun.misc.Unsafe` deprecation warning;
+it is not an app Lint finding.
+
+Automated wrap/edit coverage is specifically:
+
+- Seeded generations for every count 1–50: canonical text, structural boundaries,
+  monotonic/round-trip offsets, repeated `di`, empty connectors, Unicode accents,
+  supplementary letters and expanding lowercase `İ`. Existing generator/sound
+  and connector-weight regressions also pass.
+- 240 dp and 320 dp screen containers: every line start in the fitting-stem fixture
+  maps to a real boundary; connectors stay with the following stem. Internal `di`
+  inside a stem is not treated as a boundary.
+- A real bundled, seeded 50-stem result at 240 dp: complete canonical input,
+  more than eight layout lines, no horizontal overflow, and selection at the end.
+  A single 60-character stem wraps without horizontal overflow.
+- Full selection Copy, partial selection/Cut across displayed hints, rendered-to-
+  original accessibility selection, multiline/emoji clipboard Paste, insertion,
+  Backspace/Delete at boundaries, and resulting cursor positions. Actual Android
+  InputConnection composing/commit operations receive original text without hints.
+- Generated and edited Copy/Share callbacks, the real clipboard and captured
+  chooser/send intent contain exact original text. Disk/repository reconstruction
+  preserves exact text without hints; edits and cold restoration discard metadata.
+- About/menu order in English and in the existing real German locale-recreation
+  test; installed version metadata, unchanged dialog contents, dismissal, icon
+  dimensions/centering, localized Back, and both Settings back paths. Existing
+  activity recreation, edited-output retention, import/export/reset and settings
+  persistence tests pass.
+
+Manual visual acceptance still covers touch cursor placement/drag handles at
+wrapped boundaries, the reading/scrolling feel of 50-stem results, large system
+font scales, and keyboard animations/OEM keyboard behavior. Automated selection
+and layout assertions do not substitute for those checks. API 28–35 and an actual
+Google Play upgrade were not exercised in this pass. Cold-restored/edited text
+deliberately uses standard wrapping; no structural metadata migration is needed.
+Only Medium Phone was started for this pass, and it was shut down afterward.
+
+### Review fixes DB-01–DB-06 verification (historical v1.2.0)
 
 Version **1.2.0 / code 3**, applicationId **`com.github.jschbe.dadablubb`**, minSdk,
 dependencies, generator, bundled 449 stems/connector weights and artwork are

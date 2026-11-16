@@ -114,7 +114,6 @@
     <string name="dataset_label_connector">Verbindung %1$d</string>
     <string name="dataset_label_text">Verbindungstext</string>
     <string name="dataset_label_weight">Verbindungsgewicht</string>
-    <string name="back_symbol">←</string>
     <string name="menu_symbol">⋮</string>
     <string name="minus_symbol">−</string>
     <string name="plus_symbol">+</string>

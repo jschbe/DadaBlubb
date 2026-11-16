@@ -119,12 +119,16 @@ class AppUiTest {
         compose.waitUntil(10_000) { model.ready }
         val edited = "Edited Möter\nSecond line"
         compose.onNodeWithTag("output").performScrollTo().performTextReplacement(edited)
+        closeSoftKeyboard()
+        compose.waitForIdle()
         compose.onNodeWithText("Copy").performScrollTo().performClick()
         compose.runOnIdle {
             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             assertEquals(edited, clipboard.primaryClip!!.getItemAt(0).text.toString())
         }
         compose.onNodeWithText("OK").performClick()
+        closeSoftKeyboard()
+        compose.waitForIdle()
         compose.onNodeWithText("Share").performScrollTo().performClick()
         compose.runOnIdle {
             assertEquals(Intent.ACTION_CHOOSER, launched!!.action)
@@ -133,6 +137,21 @@ class AppUiTest {
             assertEquals(Intent.ACTION_SEND, send.action)
             assertEquals("text/plain", send.type)
             assertEquals(edited, send.getStringExtra(Intent.EXTRA_TEXT))
+        }
+        compose.onNodeWithText("Generate").performScrollTo().performClick()
+        val generated = model.output
+        compose.runOnIdle { org.junit.Assert.assertNotNull(model.outputState.value.generation) }
+        compose.onNodeWithText("Copy").performScrollTo().performClick()
+        compose.runOnIdle {
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            assertEquals(generated, clipboard.primaryClip!!.getItemAt(0).text.toString())
+        }
+        compose.onNodeWithText("OK").performClick()
+        compose.onNodeWithText("Share").performScrollTo().performClick()
+        compose.runOnIdle {
+            @Suppress("DEPRECATION")
+            val send = launched!!.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)!!
+            assertEquals(generated, send.getStringExtra(Intent.EXTRA_TEXT))
         }
     }
 

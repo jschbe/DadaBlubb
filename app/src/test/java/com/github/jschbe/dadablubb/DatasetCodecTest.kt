@@ -22,6 +22,8 @@ class DatasetCodecTest {
     @Test fun bundledVocabularyIsCuratedValidAndRoundTrips() {
         val dataset = File(checkNotNull(System.getProperty("dada.asset"))).inputStream().use(DatasetCodec::read)
         assertEquals(449, dataset.words.size)
+        assertEquals(1, dataset.words.count { it == "Pomper" })
+        assertFalse(dataset.words.contains("Pimper"))
         assertTrue(dataset.words.containsAll(listOf("Möter", "Röngel", "Döngel", "Rubbel", "Nuddel", "Wachs", "Blogg", "Schnurpsel", "Knöter", "Bummel", "Pömpel")))
         assertTrue(dataset.words.all { it.isNotBlank() && it == it.trim() })
         assertEquals(449, dataset.words.distinctBy(::stemIdentity).size)

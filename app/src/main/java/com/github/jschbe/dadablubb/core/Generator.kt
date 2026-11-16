@@ -35,13 +35,30 @@ data class Generation(val components: List<String>, val connectors: List<String>
         require(connectors.size == components.size - 1)
     }
 
-    val text: String get() {
-        val raw = buildString {
-            components.forEachIndexed { index, component ->
-                if (index > 0) append(connectors[index - 1])
-                append(component)
-            }
-        }.lowercase(Locale.GERMAN)
+    private val rawText: String get() = buildString {
+        components.forEachIndexed { index, component ->
+            if (index > 0) append(connectors[index - 1])
+            append(component)
+        }
+    }
+
+    val text: String get() = displayCase(rawText)
+
+    /** UTF-16 break opportunities before each connector + following stem, never inferred from text.
+     * Use cased prefixes because Unicode lowercasing can expand a character (e.g. İ).
+     * Context-sensitive casing can change letters, but not these German-locale prefix lengths. */
+    val stemBoundaries: List<Int> get() {
+        val raw = rawText
+        var offset = 0
+        return components.dropLast(1).mapIndexed { index, component ->
+            if (index > 0) offset += connectors[index - 1].length
+            offset += component.length
+            displayCase(raw.substring(0, offset)).length
+        }
+    }
+
+    private fun displayCase(value: String): String {
+        val raw = value.lowercase(Locale.GERMAN)
         val first = raw.codePointAt(0)
         return StringBuilder().appendCodePoint(Character.toTitleCase(first))
             .append(raw.substring(Character.charCount(first))).toString()

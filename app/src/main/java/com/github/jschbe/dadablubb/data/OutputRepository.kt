@@ -1,5 +1,6 @@
 package com.github.jschbe.dadablubb.data
 
+import com.github.jschbe.dadablubb.core.Generation
 import java.io.IOException
 import java.nio.charset.CharacterCodingException
 import kotlinx.coroutines.CoroutineScope
@@ -17,7 +18,9 @@ data class OutputState(
     val loaded: Boolean = false,
     val hasOutput: Boolean = false,
     val saving: Boolean = false,
-    val error: OutputError? = null
+    val error: OutputError? = null,
+    // Ephemeral display metadata. Disk still contains only exact UTF-8 text.
+    val generation: Generation? = null
 ) {
     val showPlaceholder get() = loaded && !hasOutput
 }
@@ -67,8 +70,12 @@ class OutputRepository(
         }
     }
 
+    fun update(text: String) = update(text, null)
+
+    fun update(generation: Generation) = update(generation.text, generation)
+
     @Synchronized
-    fun update(text: String) {
+    private fun update(text: String, generation: Generation?) {
         val error = try {
             OutputStorage.encode(text)
             null
@@ -82,7 +89,8 @@ class OutputRepository(
             return
         }
         val change = Change(++revision, text)
-        mutableState.value = OutputState(text, loaded = true, hasOutput = true, saving = true)
+        mutableState.value = OutputState(text, loaded = true, hasOutput = true, saving = true,
+            generation = generation)
         check(changes.trySend(change).isSuccess)
     }
 }
