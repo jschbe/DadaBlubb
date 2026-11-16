@@ -1,6 +1,6 @@
 # Dada Blubb
 
-Dada Blubb 1.2.2 (versionCode 5) is an offline Android playground for absurd, rhythmic,
+Dada Blubb 1.2.3 (versionCode 6) is an offline Android playground for absurd, rhythmic,
 German-sounding fantasy words, built with Kotlin and Material 3 Jetpack Compose.
 The interface supports German and English, persistent System default / Light /
 Dark themes, and Android dynamic colors. Gradle's root project is **DadaBlubb**;
@@ -19,7 +19,7 @@ its data. Nothing is automatically migrated, reset, cleared or uninstalled.
 The new app starts with the bundled vocabulary and its own preferences. If custom
 vocabulary is needed, separately export it from the old app and explicitly import
 it into the new one. Generated/edited output can be copied or shared separately;
-settings are independent. The v1.2.2 update keeps the v1.2.1 Google Play
+settings are independent. The v1.2.3 update keeps the existing Google Play
 applicationId `com.github.jschbe.dadablubb` and preserves its settings, active
 vocabulary and saved output without migration.
 
@@ -38,7 +38,7 @@ vocabulary and saved output without migration.
   confirmed reset that keeps settings.
 - The overflow menu starts with **About App**. Settings starts with **Appearance**,
   followed by **Language** and the existing generation settings. About shows installed versionName and
-  versionCode, copyright, GPL-3.0-only, the Codex credit and a source link.
+  versionCode, copyright, GPL-3.0-only, the Codex credit, source and privacy links.
 
 The supplied launcher artwork is preserved in
 [`app/artwork/DadaBlubb.png`](app/artwork/DadaBlubb.png). Android resources
@@ -89,7 +89,7 @@ The APK is `app/build/outputs/apk/debug/app-debug.apk`.
 
 ## Google Play upload signing (manual release step)
 
-The existing manual release workflow targets **1.2.2 / code 5**, applicationId
+The existing manual release workflow targets **1.2.3 / code 6**, applicationId
 `com.github.jschbe.dadablubb`. No signed release has been built or uploaded as
 part of this preparation. All four environment variables are required:
 
@@ -157,7 +157,7 @@ identity. Compare the public certificate's SHA-256 fingerprint with the trusted
 **upload certificate** in Play Console. These commands show only package content
 and public certificate information, never private keys/passwords. Do not use
 `keytool -list` against the private keystore. Check the manifest for package
-`com.github.jschbe.dadablubb`, versionName `1.2.2`, versionCode `5`, minSdk `28`
+`com.github.jschbe.dadablubb`, versionName `1.2.3`, versionCode `6`, minSdk `28`
 and targetSdk `37`. AABs use JAR signing; `apksigner` is for APKs.
 
 The **upload key** authenticates the AAB submitted to Google Play. With Play App
@@ -478,7 +478,7 @@ document IO runs through the ViewModel on `Dispatchers.IO`; output writes use a
 separate process-owned IO scope. Namespace and applicationId are
 `com.github.jschbe.dadablubb`. MinSdk 28, SDK/tool versions, generator behavior,
 all 449 stems and original artwork are preserved. Default connector weights are
-documented above. VersionName is **1.2.2**, versionCode **5**. No dependency was added or
+documented above. VersionName is **1.2.3**, versionCode **6**. No dependency was added or
 substituted for this milestone. There is no backend, DI framework or database.
 
 ## Tests and verification
@@ -1066,8 +1066,45 @@ separate-installation consequence of this pre-upload change.
 
 No INTERNET or storage permission, backend, analytics, ads, or network calls.
 Generation, validation, and private persistence work offline. Clipboard, sharing,
-and document providers and the source-code link use Android system features; other
+and document providers and the source/privacy links use Android system features; other
 apps/providers may have their own network behavior.
+
+### Privacy page and GitHub Pages setup
+
+The bilingual German/English policy is [docs/privacy.html](docs/privacy.html).
+Its public address is intended to be
+[https://jschbe.github.io/DadaBlubb/privacy.html](https://jschbe.github.io/DadaBlubb/privacy.html).
+The About dialog uses localized **Datenschutzerklärung** / **Privacy Policy** links
+to this single page, opening it with Android `ACTION_VIEW` and the existing
+missing-handler/denied-launch error handling. The source-code link is retained.
+The HTML is a static, non-editable document with local CSS, system fonts, language
+anchors and a `mailto:` contact. It has no scripts, cookies, trackers, external
+assets, build dependencies, forms, or account requirement. GitHub is a third-party
+host and may process access data under its own privacy terms.
+
+Publication is a manual follow-up; this task does not push or change repository
+settings. The URL returned **HTTP 404 on November 16, 2026**. It is **not live until
+publication is configured and deployment succeeds**:
+
+1. Verify that **android@jochen-schmitt.com** exists and receives mail. The user
+   must verify this before external publication; no message was sent by this task.
+2. Put the reviewed `docs/privacy.html` on the repository's `main` branch.
+3. On GitHub select **Settings > Pages > Deploy from a branch > main > /docs**
+   (the source selector is under **Build and deployment**), then **Save**.
+4. Wait for the Pages deployment to succeed. Check the exact HTTPS URL above
+   without signing in; verify both languages and the contact link. See
+   [GitHub's publishing-source instructions](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site).
+5. Once the page is publicly reachable, enter its URL in the app's **Privacy
+   policy** field in Google Play Console (and any release submission requesting
+   it). Review the existing Data safety answers against the app's actual behavior.
+   Signing and uploading v1.2.3 / code 6 to Internal Testing remain manual steps.
+
+The supplied policy wording was aligned with the code: Share sends the entire
+current output; Android can open external links in a suitable app, usually a
+browser; only the privacy page is hosted on GitHub Pages (the source is on
+GitHub); Android 13+ manages the app-language preference outside app-private
+storage. The German reset label matches the existing **Standard wiederherstellen**
+action. No app data handling, backup rule or permission changed.
 
 ### Android backup policy
 

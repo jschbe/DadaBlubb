@@ -38,7 +38,7 @@
     <string name="copy">Kopieren</string>
     <string name="share">Teilen</string>
     <string name="share_title">Text teilen</string>
-    <string name="copied">In die Zwischenablage kopiert.</string>
+    <string name="copied">Kopiert</string>
     <string name="no_share_app">Keine App zum Teilen von Text verfügbar.</string>
     <string name="share_denied">Die gewählte App konnte den Text nicht empfangen.</string>
     <string name="no_document_picker">Auf diesem Gerät ist keine Dateiauswahl verfügbar.</string>
@@ -64,6 +64,8 @@
     <string name="codex_credit">Entwickelt mit Unterstützung von OpenAI Codex.</string>
     <string name="source_code">Quellcode</string>
     <string name="source_url">https://github.com/jschbe/DadaBlubb</string>
+    <string name="privacy_policy">Datenschutzerklärung</string>
+    <string name="privacy_url">https://jschbe.github.io/DadaBlubb/privacy.html</string>
     <string name="no_browser">Keine App zum Öffnen dieses Links verfügbar.</string>
     <string name="unknown_version">Unbekannt</string>
     <string name="imported">Datensatz importiert: %1$s und %2$s.</string>

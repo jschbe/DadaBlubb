@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
+import android.view.accessibility.AccessibilityEvent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -21,6 +22,7 @@ import com.github.jschbe.dadablubb.core.*
 import com.github.jschbe.dadablubb.ui.theme.DadaBlubbTheme
 import kotlin.random.Random
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 
@@ -104,12 +106,16 @@ class AppUiTest {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         lateinit var model: AppViewModel
         var launched: Intent? = null
+        var denyShare = false
         compose.runOnIdle { model = AppViewModel(context.applicationContext as Application) }
         compose.setContent {
             val activityContext = LocalContext.current
             val capturingContext = remember(activityContext) {
                 object : ContextWrapper(activityContext) {
-                    override fun startActivity(intent: Intent) { launched = intent }
+                    override fun startActivity(intent: Intent) {
+                        if (denyShare) throw SecurityException("Test denied share")
+                        launched = intent
+                    }
                 }
             }
             CompositionLocalProvider(LocalContext provides capturingContext) {
@@ -117,16 +123,19 @@ class AppUiTest {
             }
         }
         compose.waitUntil(10_000) { model.ready }
-        val edited = "Edited Möter\nSecond line"
+        val edited = "Edited Möter\nSecond line 😀\n "
         compose.onNodeWithTag("output").scrollIntoView().performTextReplacement(edited)
         closeSoftKeyboard()
         compose.waitForIdle()
-        compose.onNodeWithText("Copy").scrollIntoView().performClick()
+        assertCopyToast("Copied") {
+            compose.onNodeWithText("Copy").scrollIntoView().performClick()
+        }
         compose.runOnIdle {
             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             assertEquals(edited, clipboard.primaryClip!!.getItemAt(0).text.toString())
+            assertNull(model.message)
         }
-        compose.onNodeWithText("OK").performClick()
+        compose.onAllNodes(isDialog()).assertCountEquals(0)
         closeSoftKeyboard()
         compose.waitForIdle()
         compose.onNodeWithText("Share").scrollIntoView().performClick()
@@ -145,14 +154,24 @@ class AppUiTest {
         compose.runOnIdle {
             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             assertEquals(generated, clipboard.primaryClip!!.getItemAt(0).text.toString())
+            assertNull(model.message)
         }
-        compose.onNodeWithText("OK").performClick()
+        compose.onAllNodes(isDialog()).assertCountEquals(0)
         compose.onNodeWithText("Share").scrollIntoView().performClick()
         compose.runOnIdle {
             @Suppress("DEPRECATION")
             val send = launched!!.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)!!
             assertEquals(generated, send.getStringExtra(Intent.EXTRA_TEXT))
         }
+        // Copy no longer sets a modal message; existing errors and other notices still do.
+        compose.runOnIdle { denyShare = true }
+        compose.onNodeWithText("Share").scrollIntoView().performClick()
+        compose.onNode(hasText("The selected app could not receive the text.") and hasAnyAncestor(isDialog()))
+            .assertIsDisplayed()
+        compose.onNodeWithText("OK").performClick()
+        compose.runOnIdle { model.notify(R.string.exported) }
+        compose.onNode(hasText("Active dataset exported.") and hasAnyAncestor(isDialog())).assertIsDisplayed()
+        compose.onNodeWithText("OK").performClick()
     }
 
     @Test fun settingsRadioControlsUpdateOneSettingsValue() {
@@ -181,6 +200,18 @@ class AppUiTest {
         compose.onNodeWithContentDescription("Word Count").assertIsNotEnabled()
         compose.onNodeWithText("This dataset has 1 unique stem. Word Count is limited to 1.").assertExists()
     }
+}
+
+/** Observe the system toast even when Android renders it outside the app's Compose roots. */
+internal fun assertCopyToast(expected: String, copy: () -> Unit) {
+    val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+    val event = automation.executeAndWaitForEvent({ copy() }, { event ->
+        event.eventType == AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED &&
+            event.className?.toString() == "android.widget.Toast" &&
+            event.text.any { it.toString() == expected }
+    }, 5_000)
+    @Suppress("DEPRECATION")
+    event.recycle()
 }
 
 /** Fixtures stay deterministic without changing the phone's system or application locale. */

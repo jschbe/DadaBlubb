@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
+import android.widget.Toast
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -98,6 +99,7 @@ internal fun DadaBlubbApp(
     val moreOptionsLabel = stringResource(R.string.more_options)
     val workingLabel = stringResource(R.string.working)
     val appName = stringResource(R.string.app_name)
+    val copiedLabel = stringResource(R.string.copied)
     val shareTitle = stringResource(R.string.share_title)
     val outputState by model.outputState.collectAsState()
     var settingsVisible by rememberSaveable { mutableStateOf(false) }
@@ -180,7 +182,7 @@ internal fun DadaBlubbApp(
                 onCopy = { text ->
                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     clipboard.setPrimaryClip(ClipData.newPlainText(appName, text))
-                    model.notify(R.string.copied)
+                    Toast.makeText(context, copiedLabel, Toast.LENGTH_SHORT).show()
                 },
                 onShare = { text ->
                     try {
@@ -351,7 +353,12 @@ internal fun SettingsScreen(
 @Composable
 internal fun AboutDialog(version: AppVersion, onDismiss: () -> Unit, onLinkError: () -> Unit) {
     val context = LocalContext.current
-    val sourceUrl = stringResource(R.string.source_url)
+    val openLink: (String) -> Unit = { url ->
+        try {
+            context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
+        } catch (_: ActivityNotFoundException) { onLinkError() }
+        catch (_: SecurityException) { onLinkError() }
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.about_app)) },
@@ -364,22 +371,22 @@ internal fun AboutDialog(version: AppVersion, onDismiss: () -> Unit, onLinkError
                 Text(stringResource(R.string.license_name))
                 Text(stringResource(R.string.license_explanation))
                 Text(stringResource(R.string.codex_credit))
-                TextButton(onClick = {
-                    try {
-                        context.startActivity(Intent(Intent.ACTION_VIEW,
-                            sourceUrl.toUri()))
-                    } catch (_: ActivityNotFoundException) { onLinkError() }
-                    catch (_: SecurityException) { onLinkError() }
-                }) {
-                    Column {
-                        Text(stringResource(R.string.source_code))
-                        Text(sourceUrl, style = MaterialTheme.typography.bodySmall)
-                    }
-                }
+                AboutLink(stringResource(R.string.source_code), stringResource(R.string.source_url), openLink)
+                AboutLink(stringResource(R.string.privacy_policy), stringResource(R.string.privacy_url), openLink)
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) } }
     )
+}
+
+@Composable
+private fun AboutLink(label: String, url: String, onOpen: (String) -> Unit) {
+    TextButton(onClick = { onOpen(url) }) {
+        Column {
+            Text(label)
+            Text(url, style = MaterialTheme.typography.bodySmall)
+        }
+    }
 }
 
 @Composable

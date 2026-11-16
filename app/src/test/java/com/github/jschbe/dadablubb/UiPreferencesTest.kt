@@ -47,6 +47,11 @@ class UiPreferencesTest {
         assertEquals(en["app_name"], de["app_name"])
     }
 
+    @Test fun copyConfirmationUsesShortLocalizedText() {
+        assertEquals("Copied", strings("values")["copied"])
+        assertEquals("Kopiert", strings("values-de")["copied"])
+    }
+
     @Test fun structuredValidationKeepsUsefulEnglishJvmDiagnostics() {
         val error = assertThrows(DatasetException::class.java) {
             DatasetCodec.validate(Dataset(listOf("bad word"), listOf(Connector("", 1))))

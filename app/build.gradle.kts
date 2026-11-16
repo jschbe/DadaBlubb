@@ -64,8 +64,8 @@ android {
         applicationId = "com.github.jschbe.dadablubb"
         minSdk = 28
         targetSdk = 37
-        versionCode = 5
-        versionName = "1.2.2"
+        versionCode = 6
+        versionName = "1.2.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -111,6 +111,8 @@ android {
             it.inputs.dir(file("src/main/res/xml")).withPropertyName("xmlResources")
             it.systemProperty("app.manifest", file("src/main/AndroidManifest.xml").absolutePath)
             it.inputs.file(file("src/main/AndroidManifest.xml")).withPropertyName("manifest")
+            it.systemProperty("privacy.policy", rootProject.file("docs/privacy.html").absolutePath)
+            it.inputs.file(rootProject.file("docs/privacy.html")).withPropertyName("privacyPolicy")
         }
     }
 }

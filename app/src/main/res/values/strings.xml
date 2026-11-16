@@ -38,7 +38,7 @@
     <string name="copy">Copy</string>
     <string name="share">Share</string>
     <string name="share_title">Share text</string>
-    <string name="copied">Copied to clipboard.</string>
+    <string name="copied">Copied</string>
     <string name="no_share_app">No app is available to share text.</string>
     <string name="share_denied">The selected app could not receive the text.</string>
     <string name="no_document_picker">No document picker is available on this device.</string>
@@ -64,6 +64,8 @@
     <string name="codex_credit">Developed with the assistance of OpenAI Codex.</string>
     <string name="source_code">Source code</string>
     <string name="source_url">https://github.com/jschbe/DadaBlubb</string>
+    <string name="privacy_policy">Privacy Policy</string>
+    <string name="privacy_url">https://jschbe.github.io/DadaBlubb/privacy.html</string>
     <string name="no_browser">No app is available to open this link.</string>
     <string name="unknown_version">Unknown</string>
     <string name="imported">Dataset imported: %1$s and %2$s.</string>

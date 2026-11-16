@@ -52,12 +52,17 @@ class LocaleThemeStateTest {
             compose.onNodeWithText("Version ${info.versionName} (Code ${info.longVersionCode})")
                 .performScrollTo().assertExists()
             compose.onNodeWithText("Entwickelt mit Unterstützung von OpenAI Codex.").performScrollTo().assertExists()
+            compose.onNodeWithText("Datenschutzerklärung").performScrollTo().assertIsDisplayed()
             compose.onNodeWithText("Schließen").performClick()
             compose.onNodeWithContentDescription("Zurück").performClick()
             compose.onNodeWithContentDescription("Wortanzahl verringern").assertExists()
             compose.onNodeWithText("Anzahl Wortstämme, verbunden zu Fantasiewort").assertExists()
             compose.onNodeWithText("Ein bisschen Rhythmus. Viel Unsinn.").assertDoesNotExist()
             compose.onNodeWithTag("output").assertTextEquals(edited)
+            assertCopyToast("Kopiert") {
+                compose.onNodeWithText("Kopieren").scrollIntoView().performClick()
+            }
+            compose.onAllNodes(isDialog()).assertCountEquals(0)
         } finally {
             val activity = compose.activity
             compose.runOnUiThread {
