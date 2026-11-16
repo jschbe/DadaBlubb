@@ -2,6 +2,7 @@ package com.github.jschbe.dadablubb
 
 import com.github.jschbe.dadablubb.data.*
 import com.github.jschbe.dadablubb.core.Generation
+import com.github.jschbe.dadablubb.core.OutputWrapHints
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.CountDownLatch
@@ -18,7 +19,7 @@ class OutputRepositoryTest {
     private suspend fun settled(repo: OutputRepository): OutputState =
         withTimeout(5_000) { repo.state.first { it.loaded && !it.saving } }
 
-    @Test fun structuralHintsAreEphemeralAndEveryAcceptedEditDiscardsThem() = runBlocking {
+    @Test fun structuralHintsSurviveColdRestorationAndEveryAcceptedEditDiscardsThem() = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         val disk = OutputStorage(File(folder.root, "output.txt"))
         val generated = Generation(listOf("Didi", "Möter", "Röngel"), listOf("di", ""))
@@ -26,18 +27,18 @@ class OutputRepositoryTest {
             val repo = OutputRepository(disk, scope)
             settled(repo)
             repo.update(generated)
-            assertEquals(generated, settled(repo).generation)
+            assertEquals(OutputWrapHints.from(generated), settled(repo).wrapHints)
             assertEquals(generated.text, disk.read())
             val restarted = OutputRepository(disk, scope)
             assertEquals(generated.text, settled(restarted).text)
-            assertNull(restarted.state.value.generation)
+            assertEquals(OutputWrapHints.from(generated), restarted.state.value.wrapHints)
             repo.update(generated.text + "di")
-            assertNull(settled(repo).generation)
+            assertNull(settled(repo).wrapHints)
             assertEquals(generated.text + "di", disk.read())
             repo.update(generated)
             settled(repo)
             repo.update(generated.text) // even replacement with identical characters cannot infer structure
-            assertNull(settled(repo).generation)
+            assertNull(settled(repo).wrapHints)
         } finally { scope.cancel() }
     }
 

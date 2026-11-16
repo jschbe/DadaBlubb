@@ -5,17 +5,18 @@ import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
 import com.github.jschbe.dadablubb.core.Generation
+import com.github.jschbe.dadablubb.core.OutputWrapHints
 
 /** Soft break hints exist only in the layout. The editor/IME, selection clipboard, app actions
- * and persistence all use the original text. Every text edit discards the Generation upstream.
+ * and persistence all use the original text. Every text edit discards the hints upstream.
  * Android's normal line breaker still splits a segment too wide for the field. */
-internal class StemBoundaryTransformation(generation: Generation) : VisualTransformation {
-    private val original = generation.text
-    private val boundaries = generation.stemBoundaries
+internal class StemBoundaryTransformation(private val hints: OutputWrapHints) : VisualTransformation {
+    constructor(generation: Generation) : this(OutputWrapHints.from(generation))
+    private val boundaries = hints.boundaries
 
     override fun filter(text: AnnotatedString): TransformedText {
         // Also guard against stale metadata at the rendering boundary; never reconstruct it.
-        if (text.text != original || boundaries.isEmpty()) return VisualTransformation.None.filter(text)
+        if (!hints.matches(text.text) || boundaries.isEmpty()) return VisualTransformation.None.filter(text)
         val rendered = AnnotatedString.Builder()
         var start = 0
         boundaries.forEach { end ->

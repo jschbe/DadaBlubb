@@ -62,10 +62,10 @@ class AppUiTest {
                     { copied = it }, { shared = it }, { output = it })
             }
         }
-        compose.onNodeWithText("Generate").performScrollTo().performClick()
+        compose.onNodeWithText("Generate").scrollIntoView().performClick()
         compose.onNodeWithText(expected).assertExists()
-        compose.onNodeWithText("Copy").performScrollTo().assertIsEnabled().performClick()
-        compose.onNodeWithText("Share").performScrollTo().assertIsEnabled().performClick()
+        compose.onNodeWithText("Copy").scrollIntoView().assertIsEnabled().performClick()
+        compose.onNodeWithText("Share").scrollIntoView().assertIsEnabled().performClick()
         compose.runOnIdle { assertEquals(expected, copied); assertEquals(expected, shared) }
     }
 
@@ -84,18 +84,18 @@ class AppUiTest {
         compose.onNodeWithTag("output").assertIsNotFocused()
         compose.onNodeWithText("Generate").performClick()
         compose.onNodeWithTag("output").assertTextEquals(generated).assertIsNotFocused()
-        compose.onNodeWithTag("output").performScrollTo().performTextReplacement(edited)
+        compose.onNodeWithTag("output").scrollIntoView().performTextReplacement(edited)
         compose.onNodeWithTag("output").assertTextEquals(edited)
         // Finish the system IME transition before scrolling to action hit targets.
         closeSoftKeyboard()
         compose.waitForIdle()
-        compose.onNodeWithText("Copy").performScrollTo().performClick()
+        compose.onNodeWithText("Copy").scrollIntoView().performClick()
         compose.runOnIdle { assertEquals("Copy must use the complete edited field", edited, copied) }
-        compose.onNodeWithText("Share").performScrollTo().performClick()
+        compose.onNodeWithText("Share").scrollIntoView().performClick()
         compose.runOnIdle { assertEquals("Share must use the complete edited field", edited, shared) }
-        compose.onNodeWithText("Generate").performScrollTo().performClick()
+        compose.onNodeWithText("Generate").scrollIntoView().performClick()
         compose.onNodeWithTag("output").assertTextEquals(generated).assertIsNotFocused()
-        compose.onNodeWithTag("output").performScrollTo().performTextClearance()
+        compose.onNodeWithTag("output").scrollIntoView().performTextClearance()
         compose.onNodeWithText("Copy").assertIsNotEnabled()
         compose.onNodeWithText("Share").assertIsNotEnabled()
     }
@@ -118,10 +118,10 @@ class AppUiTest {
         }
         compose.waitUntil(10_000) { model.ready }
         val edited = "Edited Möter\nSecond line"
-        compose.onNodeWithTag("output").performScrollTo().performTextReplacement(edited)
+        compose.onNodeWithTag("output").scrollIntoView().performTextReplacement(edited)
         closeSoftKeyboard()
         compose.waitForIdle()
-        compose.onNodeWithText("Copy").performScrollTo().performClick()
+        compose.onNodeWithText("Copy").scrollIntoView().performClick()
         compose.runOnIdle {
             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             assertEquals(edited, clipboard.primaryClip!!.getItemAt(0).text.toString())
@@ -129,7 +129,7 @@ class AppUiTest {
         compose.onNodeWithText("OK").performClick()
         closeSoftKeyboard()
         compose.waitForIdle()
-        compose.onNodeWithText("Share").performScrollTo().performClick()
+        compose.onNodeWithText("Share").scrollIntoView().performClick()
         compose.runOnIdle {
             assertEquals(Intent.ACTION_CHOOSER, launched!!.action)
             @Suppress("DEPRECATION")
@@ -138,16 +138,16 @@ class AppUiTest {
             assertEquals("text/plain", send.type)
             assertEquals(edited, send.getStringExtra(Intent.EXTRA_TEXT))
         }
-        compose.onNodeWithText("Generate").performScrollTo().performClick()
+        compose.onNodeWithText("Generate").scrollIntoView().performClick()
         val generated = model.output
-        compose.runOnIdle { org.junit.Assert.assertNotNull(model.outputState.value.generation) }
-        compose.onNodeWithText("Copy").performScrollTo().performClick()
+        compose.runOnIdle { org.junit.Assert.assertNotNull(model.outputState.value.wrapHints) }
+        compose.onNodeWithText("Copy").scrollIntoView().performClick()
         compose.runOnIdle {
             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             assertEquals(generated, clipboard.primaryClip!!.getItemAt(0).text.toString())
         }
         compose.onNodeWithText("OK").performClick()
-        compose.onNodeWithText("Share").performScrollTo().performClick()
+        compose.onNodeWithText("Share").scrollIntoView().performClick()
         compose.runOnIdle {
             @Suppress("DEPRECATION")
             val send = launched!!.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)!!
@@ -197,4 +197,9 @@ internal fun EnglishTestUi(content: @Composable () -> Unit) {
         LocalConfiguration provides localized.resources.configuration) {
         DadaBlubbTheme(content = content)
     }
+}
+
+/** Bounded main-screen children need no ancestor scroller; the extreme-height fallback does. */
+internal fun SemanticsNodeInteraction.scrollIntoView(): SemanticsNodeInteraction = apply {
+    if (!isDisplayed()) performScrollTo()
 }

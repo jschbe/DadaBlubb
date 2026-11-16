@@ -1,6 +1,7 @@
 package com.github.jschbe.dadablubb.data
 
 import com.github.jschbe.dadablubb.core.Generation
+import com.github.jschbe.dadablubb.core.OutputWrapHints
 import java.io.IOException
 import java.nio.charset.CharacterCodingException
 import kotlinx.coroutines.CoroutineScope
@@ -19,8 +20,7 @@ data class OutputState(
     val hasOutput: Boolean = false,
     val saving: Boolean = false,
     val error: OutputError? = null,
-    // Ephemeral display metadata. Disk still contains only exact UTF-8 text.
-    val generation: Generation? = null
+    val wrapHints: OutputWrapHints? = null
 ) {
     val showPlaceholder get() = loaded && !hasOutput
 }
@@ -32,7 +32,7 @@ class OutputRepository(
     private val storage: OutputPersistence,
     scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 ) {
-    private data class Change(val revision: Long, val text: String)
+    private data class Change(val revision: Long, val text: String, val hints: OutputWrapHints?)
     private val changes = Channel<Change>(Channel.CONFLATED)
     private val mutableState = MutableStateFlow(OutputState())
     val state = mutableState.asStateFlow()
@@ -42,7 +42,8 @@ class OutputRepository(
         scope.launch {
             val initial = try {
                 val text = storage.read()
-                OutputState(text = text.orEmpty(), loaded = true, hasOutput = text != null)
+                val hints = text?.let { optionalHints { storage.readWrapHints(it) } }
+                OutputState(text = text.orEmpty(), loaded = true, hasOutput = text != null, wrapHints = hints)
             } catch (_: IOException) {
                 OutputState(loaded = true, hasOutput = true, error = OutputError.READ)
             } catch (_: SecurityException) {
@@ -53,7 +54,11 @@ class OutputRepository(
             }
             for (change in changes) {
                 val error = try {
+                    // One writer owns all three phases. A crash loses at most optional hints;
+                    // the hash/file-instance guard rejects an old sidecar after a text commit.
+                    optionalHints { storage.invalidateWrapHints() }
                     storage.write(change.text)
+                    change.hints?.let { hints -> optionalHints { storage.writeWrapHints(change.text, hints) } }
                     null
                 } catch (_: IOException) {
                     OutputError.WRITE
@@ -72,10 +77,10 @@ class OutputRepository(
 
     fun update(text: String) = update(text, null)
 
-    fun update(generation: Generation) = update(generation.text, generation)
+    fun update(generation: Generation) = update(generation.text, OutputWrapHints.from(generation))
 
     @Synchronized
-    private fun update(text: String, generation: Generation?) {
+    private fun update(text: String, hints: OutputWrapHints?) {
         val error = try {
             OutputStorage.encode(text)
             null
@@ -88,9 +93,13 @@ class OutputRepository(
             mutableState.value = mutableState.value.copy(error = error)
             return
         }
-        val change = Change(++revision, text)
+        val change = Change(++revision, text, hints)
         mutableState.value = OutputState(text, loaded = true, hasOutput = true, saving = true,
-            generation = generation)
+            wrapHints = hints)
         check(changes.trySend(change).isSuccess)
     }
+
+    private fun <T> optionalHints(block: () -> T): T? = try { block() }
+        catch (_: IOException) { null }
+        catch (_: SecurityException) { null }
 }

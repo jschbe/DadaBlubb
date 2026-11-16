@@ -27,9 +27,8 @@
     <string name="reset">Wiederherstellen</string>
     <string name="close">Schließen</string>
     <string name="ok">OK</string>
-    <string name="home_tagline">Ein bisschen Rhythmus. Viel Unsinn.</string>
     <string name="word_count">Wortanzahl</string>
-    <string name="word_count_help">Die Anzahl der Wortstämme, verbunden zu einem Fantasiewort.</string>
+    <string name="word_count_help">Anzahl Wortstämme, verbunden zu Fantasiewort</string>
     <string name="decrease_count">Wortanzahl verringern</string>
     <string name="increase_count">Wortanzahl erhöhen</string>
     <string name="current_count">Wortanzahl: %1$d</string>

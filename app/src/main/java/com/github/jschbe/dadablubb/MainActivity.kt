@@ -5,6 +5,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.os.Bundle
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.activity.ComponentActivity
@@ -26,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.painterResource
@@ -35,13 +37,11 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.text.style.TextAlign
 import androidx.lifecycle.ViewModelProvider
 import androidx.core.net.toUri
 import com.github.jschbe.dadablubb.core.*
 import com.github.jschbe.dadablubb.data.OutputError
 import com.github.jschbe.dadablubb.ui.theme.DadaBlubbTheme
-import kotlin.math.roundToInt
 
 class MainActivity : ComponentActivity() {
     override fun attachBaseContext(newBase: Context) {
@@ -50,6 +50,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        WindowPolicy.apply(this)
         enableEdgeToEdge()
         val model = ViewModelProvider(this)[AppViewModel::class.java]
         val info = packageManager.getPackageInfo(packageName, 0)
@@ -72,6 +73,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        WindowPolicy.apply(this)
     }
 }
 
@@ -153,7 +159,7 @@ internal fun DadaBlubbApp(
             )
         }
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding)) {
+        Column(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
             if (model.busy) LinearProgressIndicator(Modifier.fillMaxWidth().semantics { contentDescription = workingLabel })
             if (settingsVisible) SettingsScreen(
                 model.settings, model::updateSettings,
@@ -162,7 +168,7 @@ internal fun DadaBlubbApp(
             else GeneratorScreen(
                 settings = model.settings,
                 output = outputState.text,
-                generation = outputState.generation,
+                wrapHints = outputState.wrapHints,
                 showOutputPlaceholder = outputState.showPlaceholder,
                 outputLoaded = outputState.loaded,
                 outputError = outputState.error,
@@ -247,92 +253,52 @@ internal fun GeneratorScreen(
     showOutputPlaceholder: Boolean = true,
     outputLoaded: Boolean = true,
     outputError: OutputError? = null,
-    generation: Generation? = null
+    wrapHints: OutputWrapHints? = null
 ) {
     val focus = LocalFocusManager.current
-    val decreaseLabel = stringResource(R.string.decrease_count)
-    val currentCountLabel = stringResource(R.string.current_count, settings.wordCount)
-    val increaseLabel = stringResource(R.string.increase_count)
-    val wordCountLabel = stringResource(R.string.word_count)
     val outputLabel = stringResource(R.string.generated_text)
-    Column(
-        Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Text(stringResource(R.string.home_tagline), style = MaterialTheme.typography.bodyLarge)
-        OutlinedCard(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp)) {
-                Text(stringResource(R.string.word_count), style = MaterialTheme.typography.titleMedium)
-                Text(stringResource(R.string.word_count_help), style = MaterialTheme.typography.bodyMedium)
-                if (maxWordCount < 50) {
-                    Text(
-                        pluralStringResource(R.plurals.count_limit, maxWordCount, maxWordCount),
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
-                }
-                Row(
-                    Modifier.align(Alignment.CenterHorizontally).padding(top = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    FilledTonalIconButton(
-                        onClick = { onSettings(settings.copy(wordCount = settings.wordCount - 1)) },
-                        enabled = settings.wordCount > 1,
-                        modifier = Modifier.size(48.dp).semantics { contentDescription = decreaseLabel }
-                    ) { Text(stringResource(R.string.minus_symbol), fontSize = 24.sp) }
-                    Text("${settings.wordCount}", style = MaterialTheme.typography.headlineMedium,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.widthIn(min = 40.dp).semantics { contentDescription = currentCountLabel })
-                    FilledTonalIconButton(
-                        onClick = { onSettings(settings.copy(wordCount = settings.wordCount + 1)) },
-                        enabled = settings.wordCount < maxWordCount,
-                        modifier = Modifier.size(48.dp).semantics { contentDescription = increaseLabel }
-                    ) { Text(stringResource(R.string.plus_symbol), fontSize = 24.sp) }
-                }
-                Spacer(Modifier.height(24.dp))
-                Slider(
-                    value = settings.wordCount.toFloat(),
-                    onValueChange = { onSettings(settings.copy(wordCount = it.roundToInt().coerceIn(1, maxWordCount))) },
-                    valueRange = 1f..maxWordCount.toFloat(),
-                    steps = (maxWordCount - 2).coerceAtLeast(0),
-                    enabled = maxWordCount > 1,
-                    modifier = Modifier.semantics { contentDescription = wordCountLabel }
-                )
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("1", style = MaterialTheme.typography.labelMedium)
-                    Text("$maxWordCount", style = MaterialTheme.typography.labelMedium)
-                }
+    GeneratorLayout(controls = {
+        GeneratorControls(settings, maxWordCount, enabled, onSettings) { focus.clearFocus(); onGenerate() }
+    }, editor = {
+        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.generated_text), style = MaterialTheme.typography.titleMedium)
+            OutlinedTextField(
+                value = output,
+                onValueChange = onOutputChange,
+                visualTransformation = remember(wrapHints) {
+                    wrapHints?.let(::StemBoundaryTransformation) ?: androidx.compose.ui.text.input.VisualTransformation.None
+                },
+                modifier = Modifier.fillMaxWidth().weight(1f).testTag("output")
+                    .semantics { contentDescription = outputLabel },
+                enabled = outputLoaded,
+                placeholder = if (showOutputPlaceholder) ({ Text(stringResource(R.string.output_placeholder)) }) else null,
+                isError = outputError != null,
+                supportingText = outputError?.let { error -> {
+                    Text(stringResource(when (error) {
+                        OutputError.READ -> R.string.output_read_failed
+                        OutputError.WRITE -> R.string.output_write_failed
+                        OutputError.TOO_LARGE -> R.string.output_too_large
+                        OutputError.INVALID_TEXT -> R.string.output_invalid_text
+                    }))
+                } },
+                textStyle = MaterialTheme.typography.headlineSmall,
+                minLines = 1,
+                maxLines = Int.MAX_VALUE
+            )
+        }
+    }, actions = { OutputActions(output, onCopy, onShare) })
+}
+
+@Composable
+private fun OutputActions(output: String, onCopy: (String) -> Unit, onShare: (String) -> Unit) {
+    val fontScale = LocalDensity.current.fontScale
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        if (maxWidth < 320.dp && fontScale > 1.3f) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { onCopy(output) }, enabled = output.isNotEmpty(), modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(stringResource(R.string.copy)) }
+                OutlinedButton(onClick = { onShare(output) }, enabled = output.isNotEmpty(), modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(stringResource(R.string.share)) }
             }
-        }
-        Button(onClick = { focus.clearFocus(); onGenerate() }, enabled = enabled, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
-            Text(stringResource(R.string.generate), style = MaterialTheme.typography.titleMedium)
-        }
-        Text(stringResource(R.string.generated_text), style = MaterialTheme.typography.titleMedium)
-        OutlinedTextField(
-            value = output,
-            onValueChange = onOutputChange,
-            visualTransformation = remember(generation) {
-                generation?.let(::StemBoundaryTransformation) ?: androidx.compose.ui.text.input.VisualTransformation.None
-            },
-            modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp).testTag("output")
-                .semantics { contentDescription = outputLabel },
-            enabled = outputLoaded,
-            placeholder = if (showOutputPlaceholder) ({ Text(stringResource(R.string.output_placeholder)) }) else null,
-            isError = outputError != null,
-            supportingText = outputError?.let { error -> {
-                Text(stringResource(when (error) {
-                    OutputError.READ -> R.string.output_read_failed
-                    OutputError.WRITE -> R.string.output_write_failed
-                    OutputError.TOO_LARGE -> R.string.output_too_large
-                    OutputError.INVALID_TEXT -> R.string.output_invalid_text
-                }))
-            } },
-            textStyle = MaterialTheme.typography.headlineSmall,
-            minLines = 4,
-            maxLines = 8
-        )
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        } else Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             OutlinedButton(onClick = { onCopy(output) }, enabled = output.isNotEmpty(), modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text(stringResource(R.string.copy)) }
             OutlinedButton(onClick = { onShare(output) }, enabled = output.isNotEmpty(), modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text(stringResource(R.string.share)) }
         }

@@ -47,11 +47,11 @@ class ReviewOutputUiTest {
             compose.waitUntil(10_000) { repo.state.value.loaded }
             compose.onNodeWithText("Your next nonsense word is one tap away.").assertExists()
             val edited = "Review Möter\nSecond line 😀"
-            compose.onNodeWithTag("output").performScrollTo().performTextReplacement(edited)
-            compose.onNodeWithText("Copy").performScrollTo().performClick()
-            compose.onNodeWithText("Share").performScrollTo().performClick()
+            compose.onNodeWithTag("output").scrollIntoView().performTextReplacement(edited)
+            compose.onNodeWithText("Copy").scrollIntoView().performClick()
+            compose.onNodeWithText("Share").scrollIntoView().performClick()
             compose.runOnIdle { assertEquals(edited, copied); assertEquals(edited, shared) }
-            compose.onNodeWithTag("output").performScrollTo().performTextClearance()
+            compose.onNodeWithTag("output").scrollIntoView().performTextClearance()
             compose.waitUntil(10_000) { !repo.state.value.saving }
             compose.onNodeWithText("Your next nonsense word is one tap away.").assertDoesNotExist()
             val restored = OutputRepository(OutputStorage(file), scope)
@@ -59,7 +59,7 @@ class ReviewOutputUiTest {
             compose.runOnIdle { active = restored }
             compose.onNodeWithTag("output").assertTextEquals("")
             compose.onNodeWithText("Your next nonsense word is one tap away.").assertDoesNotExist()
-            compose.onNodeWithText("Generate").performScrollTo().performClick()
+            compose.onNodeWithText("Generate").scrollIntoView().performClick()
             compose.waitUntil(10_000) { !restored.state.value.saving }
             compose.onNodeWithTag("output").assertTextEquals("generated again").assertIsNotFocused()
             assertEquals("generated again", OutputStorage(file).read())

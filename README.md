@@ -1,6 +1,6 @@
 # Dada Blubb
 
-Dada Blubb 1.2.1 (versionCode 4) is an offline Android playground for absurd, rhythmic,
+Dada Blubb 1.2.2 (versionCode 5) is an offline Android playground for absurd, rhythmic,
 German-sounding fantasy words, built with Kotlin and Material 3 Jetpack Compose.
 The interface supports German and English, persistent System default / Light /
 Dark themes, and Android dynamic colors. Gradle's root project is **DadaBlubb**;
@@ -19,7 +19,7 @@ its data. Nothing is automatically migrated, reset, cleared or uninstalled.
 The new app starts with the bundled vocabulary and its own preferences. If custom
 vocabulary is needed, separately export it from the old app and explicitly import
 it into the new one. Generated/edited output can be copied or shared separately;
-settings are independent. The v1.2.1 update keeps the v1.2.0 Google Play
+settings are independent. The v1.2.2 update keeps the v1.2.1 Google Play
 applicationId `com.github.jschbe.dadablubb` and preserves its settings, active
 vocabulary and saved output without migration.
 
@@ -89,7 +89,7 @@ The APK is `app/build/outputs/apk/debug/app-debug.apk`.
 
 ## Google Play upload signing (manual release step)
 
-Release signing is prepared for **1.2.1 / code 4**, applicationId
+The existing manual release workflow targets **1.2.2 / code 5**, applicationId
 `com.github.jschbe.dadablubb`. No signed release has been built or uploaded as
 part of this preparation. All four environment variables are required:
 
@@ -157,7 +157,7 @@ identity. Compare the public certificate's SHA-256 fingerprint with the trusted
 **upload certificate** in Play Console. These commands show only package content
 and public certificate information, never private keys/passwords. Do not use
 `keytool -list` against the private keystore. Check the manifest for package
-`com.github.jschbe.dadablubb`, versionName `1.2.1`, versionCode `4`, minSdk `28`
+`com.github.jschbe.dadablubb`, versionName `1.2.2`, versionCode `5`, minSdk `28`
 and targetSdk `37`. AABs use JAR signing; `apksigner` is for APKs.
 
 The **upload key** authenticates the AAB submitted to Google Play. With Play App
@@ -231,7 +231,30 @@ remain available offline after a Play installation.
 Freshly generated text prefers visual wrapping between the selected stems.
 Each connector stays with the following stem, including when the connector is
 empty. A stem/connector segment too wide for the field can still wrap normally.
-The editable field keeps its existing 4–8 visible lines and internal scrolling.
+The compact main screen has no tagline. In portrait, on both phones and tablets,
+the output field fills the remaining height and scrolls internally; Copy/Share
+stay below it at a fixed position. Wide screens place Generate beside the same
+compact count card; there is no separate tablet interface. Tablet landscape
+allows the whole page to scroll when needed, while still filling the available
+height and keeping the editor bounded. When height is limited, portrait controls
+can scroll independently above the editor. At extremely short heights or large
+font scales (including with the keyboard open), a single page scroller keeps
+every control reachable, with a bounded internally scrolling editor.
+On narrow screens with large fonts, Copy/Share stack vertically. Text sizes are
+not reduced to force content to fit, and touch targets remain at least 48 dp.
+IME insets resize the available space without replacing the editor's composition.
+
+Small displays (minimum maximum-window dimension below 600 dp) request portrait
+only. Large displays allow portrait and landscape, following the user's rotation
+setting (`FULL_USER`). Classification uses `WindowManager.maximumWindowMetrics`
+on API 30+, real display metrics on API 28–29, and configuration smallest width
+if the window service is unavailable. Rotation and IME height do not turn a
+tablet into a phone. Layout uses the current window's orientation and constraints,
+so a narrow/split window remains responsive. There is no global manifest
+`screenOrientation="portrait"` or large-screen compatibility opt-out. Android can
+ignore orientation restrictions on large displays; the app supports either
+orientation there. See [Android's large-screen orientation rules](https://developer.android.com/about/versions/17/changes/ff-restrictions-ignored)
+and [maximum window metrics](https://developer.android.com/reference/android/view/WindowManager#getMaximumWindowMetrics()).
 
 The existing value-based Material 3 editor uses `VisualTransformation` with
 explicit UTF-16 cursor mappings. U+200B soft break hints exist **only in the
@@ -241,11 +264,25 @@ No spaces or hyphens are appended. This uses the pinned Compose Foundation
 1.10.4 / Material 3 1.4.0 APIs without an editor migration or new dependencies.
 See [Compose text-field transformations](https://developer.android.com/develop/ui/compose/text/user-input).
 
-Boundary metadata stays in the process-owned output repository through activity
-recreation. The first accepted text edit discards it completely; edited text
-then uses standard wrapping, even if an undo restores the same characters.
-Cold-loaded output also uses standard wrapping because only canonical text is
-persisted. Boundaries are never guessed from substrings such as `di`.
+Boundary metadata survives activity recreation and cold starts in the small
+app-private binary sidecar `files/output.txt.wrap` (format version 1, at most
+1 KiB). It contains the actual generated UTF-16 boundaries and the exact text's
+SHA-256, protected by a checksum of the metadata record. Loading checks the
+version, checksum, text hash, increasing interior offsets, surrogate pairs and
+combining-mark boundaries. Metadata also identifies the atomically replaced
+text-file instance using its file key, modification time and size. This rejects
+a stale record even if metadata removal fails and Undo later restores identical
+text bytes. If file identity is unavailable, cold restoration safely uses normal
+wrapping. File attributes are available since API 26; see
+[Android BasicFileAttributes](https://developer.android.com/reference/java/nio/file/attribute/BasicFileAttributes).
+
+The first accepted text edit discards the hints immediately; cursor movement,
+selection and focus do not. Edited text keeps standard wrapping, including after
+Undo or a cold start. Boundaries are never guessed from substrings such as `di`.
+Legacy output without metadata, unknown/corrupt/mismatched records, and metadata
+IO failures all preserve the text and use standard wrapping. No vocabulary or
+saved-output migration is necessary. Metadata is independent of the current
+vocabulary; import/reset does not alter the current output or its valid boundaries.
 
 The current generated or edited text is stored locally in `files/output.txt` as
 UTF-8, capped at **64 KiB of encoded text**. New edits update the UI immediately.
@@ -266,7 +303,14 @@ overwrite a later edit. Each completed write syncs a temporary file and atomical
 replaces the previous file. Failure retains the prior saved file, keeps current
 text editable, and shows localized feedback; edit or Generate retries. A process
 kill or power loss before the latest write completes can still lose that pending
-change. There is no promise of synchronous per-keystroke durability or recovery
+change. The same writer serializes optional metadata invalidation, the atomic
+text write, and finally a new metadata write for generated output. Conflated
+revisions carry their own hint snapshot, so an older metadata write cannot finish
+after a newer text commit. A failed/interrupted metadata update can lose wrapping
+hints but never replaces the text; two files are not treated as one atomic commit.
+The sidecar inherits the existing cloud exclusion/device-transfer rules. A file
+identity change during device transfer can discard hints without affecting text.
+There is no promise of synchronous per-keystroke durability or recovery
 of output lost before this feature was installed.
 
 ## Generator rules
@@ -279,7 +323,7 @@ No stem can appear twice anywhere in one output. Text is never cropped to a
 character budget, and stems join into one string without spaces.
 
 The Word Count controls form a compact centered − / number / + group, separated
-from the slider by 24 dp. When an import has fewer than 50 distinct stems, the
+from the slider by 8 dp. When an import has fewer than 50 distinct stems, the
 controls show that smaller maximum and explain the limit. The current count is
 clamped and saved on load/import; it is never silently shortened during
 generation. A one-stem dataset fixes the count at 1 and disables the slider and
@@ -434,7 +478,7 @@ document IO runs through the ViewModel on `Dispatchers.IO`; output writes use a
 separate process-owned IO scope. Namespace and applicationId are
 `com.github.jschbe.dadablubb`. MinSdk 28, SDK/tool versions, generator behavior,
 all 449 stems and original artwork are preserved. Default connector weights are
-documented above. VersionName is **1.2.1**, versionCode **4**. No dependency was added or
+documented above. VersionName is **1.2.2**, versionCode **5**. No dependency was added or
 substituted for this milestone. There is no backend, DI framework or database.
 
 ## Tests and verification
@@ -497,6 +541,134 @@ cached; do not change dependency versions to make a release build pass.
 Reports: `app/build/reports/tests/testDebugUnitTest/`,
 `app/build/reports/androidTests/connected/debug/`, and
 `app/build/reports/lint-results-debug.html`.
+
+### v1.2.2 orientation follow-up (2026-11-16)
+
+This follow-up changes orientation and responsive layout only. The existing
+v1.2.2 / code 5 output persistence, wrap metadata, generator, vocabulary, strings,
+backup policy, dependencies and signing configuration remain unchanged.
+
+- `WindowPolicy.kt` classifies the maximum display window at the 600 dp boundary,
+  requests portrait for small displays and `FULL_USER` for large displays.
+- `MainActivity.kt` applies that policy at creation/configuration changes; the
+  manifest is unchanged and contains no global orientation lock.
+- `GeneratorLayout.kt` keeps portrait bounded and enables page scrolling for
+  tablet landscape or the existing short-height/font/IME exceptions. Scrollable
+  layouts still fill the viewport and keep the editor itself bounded.
+- `WindowPolicyTest.kt` checks thresholds, rotation-independent classification,
+  requested orientations and page-scroll eligibility. `WindowOrientationUiTest.kt`
+  exercises the real Android rotation and keyboard on both requested AVDs.
+- Existing constrained-window UI fixtures now declare their simulated window
+  orientation; the clipboard fixture settles the real IME before programmatic
+  selection, avoiding its initial asynchronous selection update on the tablet.
+
+The regular wrapper checks pass offline: `testDebugUnitTest`,
+`:app:compileDebugAndroidTestKotlin`, `lintDebug`, `assembleDebug` and
+`:app:assembleDebugAndroidTest`. JVM coverage totals **82 passed**, with no
+failures/errors/skips. Lint remains **0 errors / 6 existing warnings**.
+
+| AVD | Verified behavior | Full UI suite |
+| --- | --- | --- |
+| Medium Phone, Android 16 / API 36 | Portrait remains active after 0°/90° rotation requests; 50 generated stems/hints retained; long edited output scrolls internally with fixed actions; real IME and typing keep actions reachable above the keyboard | 27 passed, 0 failures/errors/skips |
+| Medium Tablet, Android 15 / API 35 | Real portrait and landscape rotation; retained generated output/hints; portrait fills height with fixed actions and internal long-text scrolling; landscape page-scroll semantics; real IME, typing and reachable actions in both orientations | 27 passed, 0 failures/errors/skips |
+
+After synchronizing initial IME/selection setup for the tablet, all four wrapping/
+clipboard tests were additionally rerun on Medium Phone: 4 passed, no failures or
+skips. Their report is retained in `medium_phone/clipboard-recheck/` below.
+
+AVDs were identified dynamically and tested sequentially with `ANDROID_SERIAL`
+set explicitly for each wrapper invocation. An initial simultaneous-boot System UI
+stall was resolved before the successful runs. Software-keyboard visibility with
+the emulated hardware keyboard was enabled temporarily and the original settings
+restored. Only the emulators started for this follow-up were stopped afterward.
+Per-device reports are retained under
+`app/build/reports/v122-orientation/medium_phone/` and `medium_tablet/`.
+
+The tablet AVD runs API 35; Android 16/17 large-display overrides and the legacy
+API 28–29 metrics fallback were checked in code/documentation, not on additional
+devices. No physical devices, commits, tags, pushes or release actions were used.
+For manual acceptance on other supported configurations, rotate with 50 stems,
+open the keyboard, and enlarge system fonts. Portrait should retain a fixed footer
+unless space becomes insufficient; tablet landscape may scroll the page to expose
+controls/actions. Android/user windowing and rotation policies remain authoritative.
+
+### Initial v1.2.2 verification before the orientation follow-up (2026-11-16)
+
+Version **1.2.2 / code 5**, same applicationId and namespace. The initial checkout
+was clean. Vocabulary bytes (449 distinct stems, including Pomper), connector
+weights, generator selection/casing/boundary algorithms, dependencies, minSdk 28,
+backup XML and AGENTS.md are unchanged. No physical device was queried or modified,
+and no release key, release AAB, publishing, commit, tag or push was used.
+
+| Changed files | Purpose |
+| --- | --- |
+| `MainActivity.kt`, `GeneratorControls.kt`, `GeneratorLayout.kt` | Compact/adaptive controls, wide layout, bounded editor, pinned actions, extreme-height fallback and IME inset consumption |
+| `res/values/strings.xml`, `res/values-de/strings.xml` | Remove unused tagline; exact requested English/German count help |
+| `core/OutputWrapHints.kt`, `data/OutputWrapMetadata.kt` | Actual generator offsets, exact-text SHA-256, validated/versioned/checksummed private metadata |
+| `data/OutputStorage.kt`, `data/OutputRepository.kt`, `StemBoundaryTransformation.kt` | Ordered atomic storage, optional hint restoration/invalidation, file-instance guard, reuse existing editor transformation |
+| `app/build.gradle.kts`, `README.md` | Version metadata and durable behavior/verification documentation; signing configuration unchanged |
+| JVM/Android test source sets | Persistence/corruption/race/error regressions, adaptive layout and real Undo; update existing tests for pinned controls and version metadata |
+
+Final successful command, project wrapper and cached dependencies, with the SDK
+configured and `ANDROID_SERIAL` explicitly set to the dynamically discovered,
+booted **medium_phone / emulator-5554 / Android 16 API 36**:
+
+```sh
+./gradlew --offline --no-configuration-cache testDebugUnitTest \
+  :app:compileDebugAndroidTestKotlin lintDebug assembleDebug \
+  :app:assembleDebugAndroidTest connectedDebugAndroidTest
+```
+
+| Check | Result |
+| --- | --- |
+| JVM tests | 79 passed; 0 failures/errors/skips |
+| Instrumentation/Compose UI tests | 26 passed; 0 failures/errors/skips |
+| Android-test compilation, debug APK and test APK assembly | Successful |
+| Lint | 0 errors; 6 existing warnings; no new warnings/suppressions |
+| Actual force-stop/cold launch, 50 stems | Text and metadata byte-identical; all 49 rendered boundaries restored |
+| Actual portrait/landscape and system font scale 200% | Actions inside the viewport; landscape count/Generate controls fully visible; editor scrolling leaves action bounds unchanged |
+
+The remaining Lint warnings are `UnusedAttribute` (1, existing localeConfig),
+`IconXmlAndPng` (2), `MonochromeLauncherIcon` (2) and `UseKtx` (1). The test tooling
+also prints its existing protobuf/JDK Unsafe deprecation warning. No dependency,
+launcher artwork or signing changes were made to address those warnings.
+
+Automated coverage includes 240/320 dp widths, 360 dp heights, 640 dp portrait
+containers, a 320 x 220 dp extreme-height fallback, font scales 1.8/2, an actual
+open IME with focus and typing retained, and pixel changes proving internal editor
+scrolling while Copy/Share bounds stay fixed. Narrow fitting-stem lines start at
+real boundaries; 50-stem output and overlong single stems remain complete.
+Activity recreation and a fresh repository retain generated hints. Real Ctrl+Z
+returns the original text after an edit without reactivating its discarded hints.
+Selection, cursor movement, clipboard Cut/Paste, composition/commit input,
+Copy/Share payloads, multiline Unicode and existing locale/theme/document flows pass.
+
+JVM tests cover legacy/empty output, missing/corrupt/truncated/oversized records,
+unknown versions, foreign hashes/file identities, invalid/duplicate/descending
+offsets, surrogate pairs and combining marks, every single-byte corruption of a
+record, failed metadata invalidation/writes/reads, failed text writes, interrupted
+storage states and blocked older metadata writes followed by rapid Generate/Edit/
+Undo revisions. These verify the original text survives and stale hints do not
+return. Interruption states are simulated; no hardware power-cut test was done.
+
+The external emulator cold-start check generated 50 stems through the app UI,
+read only its test output/sidecar, force-stopped and relaunched the actual app,
+and compared exact UTF-8 bytes plus all 49 rendered hints. Its example used a
+404-byte output and a 354-byte sidecar. Rotation and the real system font-scale
+setting were restored after inspection. Artifacts (local build outputs, not Git):
+
+- `app/build/reports/v122/cold-start.json`
+- `app/build/reports/v122/portrait-cold.png`, `portrait-scrolled.png`, `landscape.png`, `portrait-font-200.png`
+
+Remaining manual acceptance: check selection-handle dragging at wraps and OEM
+keyboard suggestions/composition on supported Android versions; try 50 stems in
+German/English with 200% fonts, rotation and keyboard toggles. In the extreme-height
+fallback, scroll the page outside the editor to reach controls/actions, and scroll
+inside the editor to read output. Edit and Undo, then cold-start after storage
+settles: text must remain exact and use normal wrapping. These checks complement
+the automated assertions; API 28–35 and a real Play upgrade were not run here.
+Pending asynchronous edits retain the existing process-kill durability limitation.
+Only the Medium Phone emulator started for this pass was shut down afterward.
 
 ### Milestone v1.2.1 verification (2026-11-16)
 

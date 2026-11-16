@@ -27,9 +27,8 @@
     <string name="reset">Reset</string>
     <string name="close">Close</string>
     <string name="ok">OK</string>
-    <string name="home_tagline">A little rhythm. A lot of nonsense.</string>
     <string name="word_count">Word Count</string>
-    <string name="word_count_help">The number of stems, joined into one fantasy string.</string>
+    <string name="word_count_help">Number of stems combined into a fantasy word</string>
     <string name="decrease_count">Decrease word count</string>
     <string name="increase_count">Increase word count</string>
     <string name="current_count">Word count: %1$d</string>

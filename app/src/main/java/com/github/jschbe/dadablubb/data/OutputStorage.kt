@@ -1,5 +1,6 @@
 package com.github.jschbe.dadablubb.data
 
+import com.github.jschbe.dadablubb.core.OutputWrapHints
 import java.io.File
 import java.io.ByteArrayOutputStream
 import java.io.FileOutputStream
@@ -10,15 +11,54 @@ import java.nio.charset.CodingErrorAction
 import java.nio.file.Files
 import java.nio.file.NoSuchFileException
 import java.nio.file.StandardCopyOption
+import java.nio.file.attribute.BasicFileAttributes
 
 interface OutputPersistence {
     /** null means never saved; an empty string is an intentionally empty output. */
     fun read(): String?
     fun write(text: String)
+    fun readWrapHints(text: String): OutputWrapHints? = null
+    fun invalidateWrapHints() {}
+    fun writeWrapHints(text: String, hints: OutputWrapHints) {}
 }
 
 /** Bounded UTF-8 with same-directory atomic replacement. Never rewrites a failed read. */
 class OutputStorage(private val file: File) : OutputPersistence {
+    private val metadata = File(file.parentFile, "${file.name}.wrap")
+
+    override fun readWrapHints(text: String): OutputWrapHints? {
+        val identity = fileIdentity() ?: return null
+        val bytes = try {
+            Files.newInputStream(metadata.toPath()).use { input ->
+                val buffer = ByteArray(OutputWrapMetadata.MAX_BYTES + 1)
+                var size = 0
+                while (size < buffer.size) {
+                    val count = input.read(buffer, size, buffer.size - size)
+                    if (count == -1) break
+                    size += count
+                }
+                buffer.copyOf(size)
+            }
+        } catch (_: NoSuchFileException) { return null }
+        return OutputWrapMetadata.decode(bytes, text, identity)
+    }
+
+    override fun invalidateWrapHints() { Files.deleteIfExists(metadata.toPath()) }
+
+    override fun writeWrapHints(text: String, hints: OutputWrapHints) {
+        if (!hints.matches(text)) return
+        val identity = fileIdentity() ?: return
+        atomicWrite(metadata, OutputWrapMetadata.encode(hints, identity))
+    }
+
+    /** Atomic replacement changes the file instance even when Undo restores identical bytes.
+     * This additional guard rejects stale sidecars if their invalidation failed. Unsupported
+     * file identities simply disable cold restoration of optional hints. */
+    private fun fileIdentity(): String? {
+        val attributes = Files.readAttributes(file.toPath(), BasicFileAttributes::class.java)
+        val key = attributes.fileKey() ?: return null
+        return "$key|${attributes.lastModifiedTime()}|${attributes.size()}"
+    }
     override fun read(): String? {
         val source = try { Files.newInputStream(file.toPath()) }
         catch (_: NoSuchFileException) { return null }
@@ -39,13 +79,17 @@ class OutputStorage(private val file: File) : OutputPersistence {
 
     override fun write(text: String) {
         val bytes = encode(text)
-        val temporary = Files.createTempFile(file.parentFile!!.toPath(), "output-", ".tmp")
+        atomicWrite(file, bytes)
+    }
+
+    private fun atomicWrite(target: File, bytes: ByteArray) {
+        val temporary = Files.createTempFile(target.parentFile!!.toPath(), "output-", ".tmp")
         try {
             FileOutputStream(temporary.toFile()).use {
                 it.write(bytes)
                 it.fd.sync()
             }
-            Files.move(temporary, file.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+            Files.move(temporary, target.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
         } finally {
             runCatching { Files.deleteIfExists(temporary) }
         }

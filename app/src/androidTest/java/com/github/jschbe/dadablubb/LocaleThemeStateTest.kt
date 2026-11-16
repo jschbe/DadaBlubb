@@ -25,7 +25,7 @@ class LocaleThemeStateTest {
             val activity = compose.activity
             compose.runOnUiThread { assertTrue(AppLocales.apply(activity, AppLanguage.ENGLISH)) }
             waitForText("Generate")
-            compose.onNodeWithTag("output").performScrollTo().performTextReplacement(edited)
+            compose.onNodeWithTag("output").scrollIntoView().performTextReplacement(edited)
             closeSoftKeyboard()
             compose.onNodeWithContentDescription("More options").performClick()
             compose.onNodeWithText("Settings").performClick()
@@ -55,6 +55,8 @@ class LocaleThemeStateTest {
             compose.onNodeWithText("Schließen").performClick()
             compose.onNodeWithContentDescription("Zurück").performClick()
             compose.onNodeWithContentDescription("Wortanzahl verringern").assertExists()
+            compose.onNodeWithText("Anzahl Wortstämme, verbunden zu Fantasiewort").assertExists()
+            compose.onNodeWithText("Ein bisschen Rhythmus. Viel Unsinn.").assertDoesNotExist()
             compose.onNodeWithTag("output").assertTextEquals(edited)
         } finally {
             val activity = compose.activity
